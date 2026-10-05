@@ -100,7 +100,8 @@ the gallery keeps its state across page reloads and sessions.
 ## Data Model (rough draft)
 
 All tables use UUID primary keys. The API exposes `id` as a `string`, matching the
-PDF model. Schema changes go through **TypeORM migrations** only.
+PDF model. Schema changes go through **TypeORM migrations** only. Table names are
+`artworks` and `users` (`user` is a reserved word in Postgres).
 
 ### `ArtworkType` (enum)
 
@@ -230,7 +231,8 @@ No relations between `User` and `Artwork` (ownership or audit) are needed for th
 - **Controllers** contain no business logic. **Services** contain no `req`/`res`.
 - **Validation**: the `validate` middleware parses `body`, `query` or `params` with
   Zod. On failure it returns **400** with per-field details. Unknown body keys are
-  stripped.
+  stripped. Parsed values go to `res.locals.validated`, because Express 5's
+  `req.query` can't be reassigned.
 - **Errors**: services throw `HttpError(status, code, message)`. One `errorHandler`
   formats every error, and unknown errors become a 500 without a stack trace in
   production.
@@ -403,11 +405,13 @@ The mockup in the PDF ("ArtGalleryManager") is the reference.
 - Image at a 4:3 ratio with `object-cover`. With no `imageUrl` (or when the image
   fails to load), a `--muted` placeholder shows the type icon.
 - Row 1: **title** (semibold, one line, truncated) and **price** right-aligned
-  (bold, `Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })` → `$5,500`).
+  (bold, `Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, trailingZeroDisplay: 'stripIfInteger' })`
+  → `$5,500`, `$4,500.50`).
 - Row 2: "By: {artist}" in `--muted-foreground`, small.
 - Row 3: type badge and availability badge.
 - Admin only: a kebab menu (Edit / Delete) in the top-right corner of the image.
-  It stops click propagation so it doesn't trigger card navigation.
+  It is rendered as a sibling of the card link (not nested inside it), so opening
+  it never triggers card navigation.
 
 ### Forms & dialogs
 
@@ -436,19 +440,25 @@ The mockup in the PDF ("ArtGalleryManager") is the reference.
 
 ## Roadmap
 
-1. **Setup**: workspaces, TS configs, ESLint/Prettier, the `art_gallery`
-   database on local Postgres, Vite, Tailwind v4 and shadcn init.
-2. **Backend core**: DataSource, `Artwork` and `User` entities with migrations, seed
-   script, error handling and validation middleware.
-3. **Auth API**: register, login, logout, me. `requireAuth` and `requireRole`.
-4. **Artworks API**: list with filters, sort and pagination; get by id; create;
-   update; delete. Vitest coverage.
-5. **Frontend shell**: theme tokens, layout (Header/Footer), router, guards,
-   AuthProvider, login and register pages.
-6. **Gallery**: grid, cards, toolbar with URL-synced filters, pagination,
-   loading/empty/error states.
-7. **Admin actions**: add/edit form dialog, delete confirmation, toasts.
-8. **Detail page**, 404 page, README with setup steps, final polish.
+Each step is a feature spec in `context/features/`. Run them in order with
+`/feature load <name>`, for example `/feature load setup-phase-1-spec`.
+
+| #  | Spec                       | Scope                                                                  |
+| -- | -------------------------- | ---------------------------------------------------------------------- |
+| 1  | `setup-phase-1-spec`       | npm workspaces, TS/ESLint/Prettier/Vitest, `shared` package constants  |
+| 2  | `setup-phase-2-spec`       | Express skeleton: env, helmet/cors/cookies, error contract, `validate` |
+| 3  | `setup-phase-3-spec`       | TypeORM + local Postgres, migration and seed scripts                   |
+| 4  | `setup-phase-4-spec`       | Vite client, Tailwind v4, shadcn/ui, theme tokens, Poppins             |
+| 5  | `setup-phase-5-spec`       | Router, TanStack Query, `lib/api.ts`, Header/Footer, 404 page          |
+| 6  | `auth-phase-1-spec`        | `User` entity, login/logout/me, JWT cookie, `requireAuth`/`requireRole`, admin seed |
+| 7  | `auth-phase-2-spec`        | `POST /auth/register`                                                  |
+| 8  | `auth-phase-3-spec`        | Login/register pages, route guards, header user menu                   |
+| 9  | `artworks-phase-1-spec`    | `Artwork` entity, 4-artwork seed, `GET /artworks` (+ filters/sort/pages), `GET /artworks/:id` |
+| 10 | `artworks-phase-2-spec`    | Admin `POST` / `PUT` / `DELETE /artworks`                              |
+| 11 | `gallery-phase-1-spec`     | Gallery grid, cards, type and availability badges                      |
+| 12 | `gallery-phase-2-spec`     | Toolbar filters/sort, URL state, pagination                            |
+| 13 | `gallery-phase-3-spec`     | Admin add/edit dialog, delete confirmation, mutations                  |
+| 14 | `artwork-detail-spec`      | `/artworks/:id` page, final polish                                     |
 
 ## Status
 
