@@ -1,0 +1,20 @@
+# deps
+node_modules/
+# build output
+out/
+build/
+dist/
+# env & secrets
+.env
+.env.*
+!.env.example
+# AI local overrides (machine/account-specific IDs, secrets)
+CLAUDE.local.md
+# logs
+*.log
+npm-debug.log*
+# os / editor junk
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

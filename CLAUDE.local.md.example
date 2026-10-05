@@ -1,0 +1,16 @@
+# Local AI Overrides (gitignored)
+
+Copy this file to `CLAUDE.local.md` and fill in machine/account-specific values.
+`CLAUDE.local.md` is gitignored, so secrets and infra details never get committed.
+Claude Code loads it automatically alongside CLAUDE.md.
+
+## Local database
+
+<!-- Referenced by the "Database Rules" block in CLAUDE.md. Never put passwords here; they live in server/.env. -->
+
+- Dev DB: native PostgreSQL 18, `localhost:5432`, database `art_gallery`, user `postgres`
+- Production DB host: `<host>`   # listed only so the AI knows what NOT to touch
+
+## Anything else machine-specific
+
+- <local paths, port overrides, personal tokens read via env, etc.>
