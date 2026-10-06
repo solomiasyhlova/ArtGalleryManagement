@@ -29,15 +29,30 @@
   --accent-foreground: #18181b;
   --destructive: #dc2626;
   --success: #16a34a;
+  /* --success text on the badge background is below AA (3.1:1), so the label uses a darker green */
+  --success-badge: #f0fdf4;
+  --success-badge-foreground: #15803d;
   --footer: #1c1c1c;
   --footer-foreground: #fafafa;
 
   --type-painting: #2563eb;
+  --type-painting-badge: #eff6ff;
+  --type-painting-badge-foreground: #1d4ed8;
   --type-sculpture: #d97706;
+  --type-sculpture-badge: #fffbeb;
+  --type-sculpture-badge-foreground: #b45309;
   --type-photography: #7c3aed;
+  --type-photography-badge: #f5f3ff;
+  --type-photography-badge-foreground: #6d28d9;
   --type-drawing: #0d9488;
+  --type-drawing-badge: #f0fdfa;
+  --type-drawing-badge-foreground: #0f766e;
   --type-print: #e11d48;
+  --type-print-badge: #fff1f2;
+  --type-print-badge-foreground: #be123c;
   --type-digital: #334155;
+  --type-digital-badge: #f8fafc;
+  --type-digital-badge-foreground: #1e293b;
 
   --radius: 0.625rem;
 }
@@ -65,15 +80,29 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-success: var(--success);
+  --color-success-badge: var(--success-badge);
+  --color-success-badge-foreground: var(--success-badge-foreground);
   --color-footer: var(--footer);
   --color-footer-foreground: var(--footer-foreground);
 
   --color-type-painting: var(--type-painting);
+  --color-type-painting-badge: var(--type-painting-badge);
+  --color-type-painting-badge-foreground: var(--type-painting-badge-foreground);
   --color-type-sculpture: var(--type-sculpture);
+  --color-type-sculpture-badge: var(--type-sculpture-badge);
+  --color-type-sculpture-badge-foreground: var(--type-sculpture-badge-foreground);
   --color-type-photography: var(--type-photography);
+  --color-type-photography-badge: var(--type-photography-badge);
+  --color-type-photography-badge-foreground: var(--type-photography-badge-foreground);
   --color-type-drawing: var(--type-drawing);
+  --color-type-drawing-badge: var(--type-drawing-badge);
+  --color-type-drawing-badge-foreground: var(--type-drawing-badge-foreground);
   --color-type-print: var(--type-print);
+  --color-type-print-badge: var(--type-print-badge);
+  --color-type-print-badge-foreground: var(--type-print-badge-foreground);
   --color-type-digital: var(--type-digital);
+  --color-type-digital-badge: var(--type-digital-badge);
+  --color-type-digital-badge-foreground: var(--type-digital-badge-foreground);
 
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);

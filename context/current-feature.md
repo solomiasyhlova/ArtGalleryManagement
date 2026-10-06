@@ -1,4 +1,4 @@
-# Current Feature
+# Current Feature: Gallery - Artwork Grid & Cards
 
 <!-- H1 gets the feature name when active, e.g. "# Current Feature: Add Navbar" -->
 
@@ -6,15 +6,52 @@
 
 <!-- Not Started | In Progress | Complete -->
 
-Not Started
+In Progress
 
 ## Goals
 
 <!-- Bullet points of what success looks like. Filled by `/feature load`. -->
 
+- The placeholder `GalleryPage` is replaced by the "Explore Our Collection" heading and an `ArtworkGrid` fed by `GET /artworks` (no filters yet)
+- `useArtworks(params)` wraps `useQuery({ queryKey: ['artworks', params], queryFn })` through `lib/api.ts`
+- `ArtworkGrid`: 1 column, 2 at `sm`, 3 at `lg`, 4 at `xl`, 24px gap; 8 skeleton cards while loading; "No artworks yet" when empty; an error message with a "Try again" button that calls `refetch`
+- `ArtworkCard` links to `/artworks/:id`: 2px border in the type accent, `rounded-lg`, shadow that lifts on hover
+- `ArtworkImage`: 4:3, `object-cover`, `loading="lazy"`, `alt="{title} by {artist}"`; no `imageUrl` or a failed load → muted placeholder with the type icon
+- Card rows: title (truncated) + price right-aligned via `formatPrice`; "By: {artist}" in muted text; `TypeBadge` + `AvailabilityBadge`
+- `lib/artwork-types.ts`: `Record<ArtworkType, { label, icon, borderClass, badgeClass }>` with the Type Reference colors, plus a test that every `ARTWORK_TYPES` entry is mapped
+- `TypeBadge` (label + type colors) and `AvailabilityBadge` ("For sale" with a success dot, "Exhibition only" with a muted dot)
+- Seeded data renders correctly: painting blue, digital slate, sculpture amber borders; prices `$5,500`, `$3,500`, `$11,000`
+- `npm test`, `npm run typecheck`, `npm run lint` and `npm run build` pass
+
 ## Notes
 
 <!-- Additional context, constraints, or details from the spec. -->
+
+- Spec: `context/features/gallery-phase-1-spec.md`
+- Files to create: `hooks/useArtworks.ts`, `lib/artwork-types.ts` (+ test), `components/artworks/` `ArtworkGrid`, `ArtworkCard`, `ArtworkCardSkeleton`, `ArtworkImage`, `TypeBadge`, `AvailabilityBadge`. Modify: `pages/GalleryPage.tsx`
+- Tailwind only generates classes it sees as complete strings: put full literal classes (`border-type-painting`, …) in `artwork-types.ts`, never `` `border-type-${type}` ``
+- Typing the map as `Record<ArtworkType, …>` makes a new type in `ARTWORK_TYPES` a compile error until it's mapped
+- Image fallback: keep a `failed` flag in state; don't swap `src` to another URL (it could fail too and loop)
+- Badges always show their text label, so color is never the only signal
+- Badge background / text colors (e.g. painting `#EFF6FF` / `#1D4ED8`, "For sale" bg `#F0FDF4`) are not tokens yet; add them as tokens in `index.css` rather than hard-coding hex in components
+- The `/artworks/:id` route arrives in artwork-detail; until then a card click lands on the 404 page
+- lucide 1.x has no brand icons, but it has generic ones for the type placeholders (verify names against the installed version)
+- Manual checks: Slow 4G → skeletons; stop the server → error state, restart + "Try again" → grid loads; an artwork with `imageUrl: "https://example.com/missing.jpg"` → placeholder (create via API, delete afterwards with OK); 375 / 768 / 1280 / 1536px → 1 / 2 / 3 / 4 columns. Empty state via filters is covered in gallery-phase-2
+- Per memory: no stubbed API responses in Playwright for the error state; ask the user to stop the server
+
+### Implementation notes
+
+- Badge colors are tokens: `--type-<type>-badge` / `--type-<type>-badge-foreground`, `--success-badge` / `--success-badge-foreground`. Badge text uses `#15803d` (green-700, 4.79:1), not `--success` (3.15:1 on `#F0FDF4`, below AA)
+- "Exhibition only" text is `--secondary-foreground`: `--muted-foreground` on `--muted` is 4.40:1, just under AA. Its dot stays `--muted-foreground`
+- Card borders are softened to match the mockup (user request): `border-type-<type>/50`, the accent at 50% opacity, still 2px. The image is inset like the mockup (`m-3 mb-0`, `rounded-md`, text `p-3`); the skeleton matches
+- Type icons (lucide 1.52): Paintbrush, Amphora, Camera, Pencil, Stamp, Monitor
+- `ArtworkImage` stores the failed URL, not a boolean, so a changed `src` (after an edit) gets a fresh attempt without an effect
+- `GalleryPage` owns the query and passes `artworks` / `error` / `onRetry` / `isRetrying` to `ArtworkGrid` (phase 2 needs `meta` there for pagination). Loaded data wins over a later refetch error
+- `useArtworks.ts` also exports `artworksPath()` (skips undefined / empty params) + test, and `artworksQuery()` (`queryOptions`)
+- The `/health` placeholder is gone from `GalleryPage`
+- Tailwind `xl` starts at exactly 1280px, so a 1280px **viewport** shows 4 columns (1279 → 3). The spec's "1280 → 3" holds for a 1280px window with a classic scrollbar
+- With the API down, a page **reload** goes to `/login` (`GET /auth/me` fails → no user). The grid's error state appears when the session is cached but `/artworks` fails
+- Verified in real Chrome (Playwright, real API + `art_gallery`): 4 seeded cards with borders, prices, badges, 4:3 lazy images and alts; hover lift; focus ring; 375/768/1279/1536 → 1/2/3/4 columns with no overflow; a broken `imageUrl` → camera placeholder; Slow 4G (CDP throttling) → 8 skeletons; API process stopped → error state → API restarted → "Try again" loads the grid. The test artwork was deleted via the API (204) with the user's OK
 
 ## History
 
