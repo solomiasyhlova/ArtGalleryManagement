@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import type { EntityManager } from 'typeorm';
 import { AppDataSource } from './data-source.js';
 import { seedAdmin } from './seeds/admin.seed.js';
+import { seedArtworkImages } from './seeds/artwork-images.seed.js';
 import { seedArtworks } from './seeds/artworks.seed.js';
 
 interface SeedStep {
@@ -13,6 +14,7 @@ interface SeedStep {
 const SEED_STEPS: SeedStep[] = [
   { name: 'admin user', run: seedAdmin },
   { name: 'starter artworks', run: seedArtworks },
+  { name: 'artwork images', run: seedArtworkImages },
 ];
 
 async function seed(): Promise<void> {

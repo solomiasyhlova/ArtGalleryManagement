@@ -121,7 +121,7 @@ Postgres enum, the Zod schema and the UI select. See the
 | `type`         | `ArtworkType`  | `artwork_type` enum NOT NULL, indexed   |                                                  |
 | `price`        | `number`       | `numeric(12,2)` NOT NULL, `CHECK > 0`   | TypeORM **transformer** maps string → `number`   |
 | `availability` | `boolean`      | `boolean` NOT NULL DEFAULT `true`       | `true` = for sale, `false` = exhibition only     |
-| `imageUrl`     | `string\|null` | `varchar(2048)` NULL                    | **extension**; a placeholder is shown when null  |
+| `imageUrl`     | `string\|null` | `varchar(2048)` NULL                    | **extension**; absolute `http(s)` URL (local pictures: `${PUBLIC_URL}/images/<file>`); a placeholder is shown when null |
 | `createdAt`    | `string` (ISO) | `timestamptz` DEFAULT `now()`           | default sort                                     |
 | `updatedAt`    | `string` (ISO) | `timestamptz` DEFAULT `now()`           |                                                  |
 
@@ -152,6 +152,11 @@ No relations between `User` and `Artwork` (ownership or audit) are needed for th
 | Geometric Harmony | Liam Smith      | digital     | 11000  | false        |
 | Bronze Reverie    | Elena Petrova   | sculpture   | 8200   | true         |
 
+- **Artwork images (extension):** pictures live in `server/public/images/` and are served
+  at `GET /images/<file>` (image extensions only; anything else is a 404). The seed gives every artwork **without** an image the picture
+  whose file name matches its title slug (`abstract-vibrance.jpg` → "Abstract Vibrance").
+  Keep pictures ≤ 1600px wide and roughly ≤ 500 KB.
+
 ## Tech Stack
 
 | Layer            | Choice                                                                                  |
@@ -170,7 +175,7 @@ No relations between `User` and `Artwork` (ownership or audit) are needed for th
 | ORM              | **TypeORM**. **Migrations only; `synchronize: false` always.**                          |
 | Validation       | **Zod**. The schemas live in `shared/` and are used by the API and the forms.           |
 | Auth             | `bcrypt` (cost 12) · `jsonwebtoken` (HS256) · `cookie-parser`                           |
-| Security         | `helmet` · `cors` (origin = `CLIENT_URL`, `credentials: true`)                          |
+| Security         | `helmet` (CORP `same-site` for `/images`) · `cors` (origin = `CLIENT_URL`, `credentials: true`) |
 | Testing          | **Vitest**: shared schemas, server services, controllers and middleware (DB mocked)     |
 | Lint / format    | ESLint + Prettier                                                                       |
 
@@ -184,7 +189,8 @@ No relations between `User` and `Artwork` (ownership or audit) are needed for th
 
 `server/.env`: `PORT`, `DATABASE_URL` (e.g.
 `postgres://postgres:<password>@localhost:5432/art_gallery`), `JWT_SECRET`, `JWT_EXPIRES_IN` (e.g. `1d`),
-`CLIENT_URL`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_NAME`, `NODE_ENV`
+`CLIENT_URL`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_NAME`, `NODE_ENV`, `PUBLIC_URL` (optional,
+default `http://localhost:$PORT`; the base of stored image URLs)
 `client/.env`: `VITE_API_URL=http://localhost:8000`
 
 ## Architecture Notes
@@ -200,17 +206,19 @@ No relations between `User` and `Artwork` (ownership or audit) are needed for th
 │  └─ types.ts              # Artwork, User, Paginated<T>, ApiError (z.infer-based)
 ├─ server/src/
 │  ├─ index.ts              # bootstrap: init DataSource, listen
-│  ├─ app.ts                # express app: helmet, cors, json, cookies, routes, errors
+│  ├─ app.ts                # express app: helmet, cors, json, cookies, routes (incl. /images), errors
 │  ├─ config/env.ts         # Zod-validated process.env
+│  ├─ config/paths.ts       # IMAGES_DIR (server/public/images), IMAGES_ROUTE
 │  ├─ db/data-source.ts     # TypeORM DataSource
 │  ├─ db/migrations/        # generated migrations
-│  ├─ db/seed.ts            # admin + 4 artworks
+│  ├─ db/seed.ts            # admin + 4 artworks + artwork images
 │  ├─ entities/             # Artwork.ts, User.ts
-│  ├─ routes/               # auth.routes.ts, artworks.routes.ts
+│  ├─ routes/               # auth.routes.ts, artworks.routes.ts, images.routes.ts
 │  ├─ controllers/          # HTTP in/out only
 │  ├─ services/             # business logic + repository access
-│  ├─ middleware/           # requireAuth, requireRole, validate, errorHandler, notFound
-│  └─ utils/                # HttpError, jwt helpers, cookie options
+│  ├─ middleware/           # requireAuth, requireRole, validate, errorHandler, notFound, imageFilesOnly
+│  └─ utils/                # HttpError, jwt helpers, cookie options, escapeLike, image slugs
+├─ server/public/images/    # artwork pictures served at /images (extension)
 └─ client/src/
    ├─ main.tsx, App.tsx     # providers (QueryClient, Router, AuthProvider, Toaster)
    ├─ router.tsx            # route table + guards
@@ -317,6 +325,7 @@ Modals are component state, not routes:
 | `PUT`    | `/artworks/:id`   | ✔    | admin | `ArtworkInput` (full replace)           | 200 `Artwork`     | 400, 401, 403, 404  |
 | `DELETE` | `/artworks/:id`   | ✔    | admin | —                                       | 204               | 401, 403, 404       |
 | `GET`    | `/health`         | —    | —     | —                                       | 200 `{ status: "ok" }` |                |
+| `GET`    | `/images/:file`   | —    | —     | —                                       | 200 image (static) | 404                |
 
 `ArtworkInput` = `{ title, artist, type, price, availability?, imageUrl? }`.
 Example from the PDF:
@@ -454,11 +463,12 @@ Each step is a feature spec in `context/features/`. Run them in order with
 | 7  | `auth-phase-2-spec`        | `POST /auth/register`                                                  |
 | 8  | `auth-phase-3-spec`        | Login/register pages, route guards, header user menu                   |
 | 9  | `artworks-phase-1-spec`    | `Artwork` entity, 4-artwork seed, `GET /artworks` (+ filters/sort/pages), `GET /artworks/:id` |
-| 10 | `artworks-phase-2-spec`    | Admin `POST` / `PUT` / `DELETE /artworks`                              |
-| 11 | `gallery-phase-1-spec`     | Gallery grid, cards, type and availability badges                      |
-| 12 | `gallery-phase-2-spec`     | Toolbar filters/sort, URL state, pagination                            |
-| 13 | `gallery-phase-3-spec`     | Admin add/edit dialog, delete confirmation, mutations                  |
-| 14 | `artwork-detail-spec`      | `/artworks/:id` page, final polish                                     |
+| 10 | `artwork-images-spec`      | **(extension)** `server/public/images` served at `/images`, seed links pictures by title slug |
+| 11 | `artworks-phase-2-spec`    | Admin `POST` / `PUT` / `DELETE /artworks`                              |
+| 12 | `gallery-phase-1-spec`     | Gallery grid, cards, type and availability badges                      |
+| 13 | `gallery-phase-2-spec`     | Toolbar filters/sort, URL state, pagination                            |
+| 14 | `gallery-phase-3-spec`     | Admin add/edit dialog, delete confirmation, mutations                  |
+| 15 | `artwork-detail-spec`      | `/artworks/:id` page, final polish                                     |
 
 ## Status
 
