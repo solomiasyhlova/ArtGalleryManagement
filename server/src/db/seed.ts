@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import type { EntityManager } from 'typeorm';
 import { AppDataSource } from './data-source.js';
+import { seedAdmin } from './seeds/admin.seed.js';
 
 interface SeedStep {
   name: string;
@@ -8,7 +9,7 @@ interface SeedStep {
 }
 
 // Each step must be idempotent. They run in order inside one transaction.
-const SEED_STEPS: SeedStep[] = [];
+const SEED_STEPS: SeedStep[] = [{ name: 'admin user', run: seedAdmin }];
 
 async function seed(): Promise<void> {
   await AppDataSource.initialize();

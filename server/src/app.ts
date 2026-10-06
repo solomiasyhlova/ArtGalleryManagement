@@ -5,6 +5,7 @@ import helmet from 'helmet';
 import { env } from './config/env.js';
 import { errorHandler } from './middleware/error-handler.js';
 import { notFound } from './middleware/not-found.js';
+import { authRouter } from './routes/auth.routes.js';
 import { healthRouter } from './routes/health.routes.js';
 
 export function createApp(): Express {
@@ -16,6 +17,7 @@ export function createApp(): Express {
   app.use(cookieParser());
 
   app.use(healthRouter);
+  app.use('/auth', authRouter);
 
   app.use(notFound);
   app.use(errorHandler);

@@ -1,4 +1,4 @@
-# Current Feature
+# Current Feature: Auth API - User Model, Login & Session (auth-phase-1)
 
 <!-- H1 gets the feature name when active, e.g. "# Current Feature: Add Navbar" -->
 
@@ -6,15 +6,47 @@
 
 <!-- Not Started | In Progress | Complete -->
 
-Not Started
+In Progress
 
 ## Goals
 
 <!-- Bullet points of what success looks like. Filled by `/feature load`. -->
 
+- `bcrypt`, `jsonwebtoken`, `ms` (+ `@types/*`) installed in `server`
+- `User` entity (`server/src/entities/User.ts`): table `users`, `user_role` enum (default `user`), unique lower-cased `email`, `passwordHash` with `select: false`; registered in `data-source.ts`
+- `CreateUsers` migration generated, reviewed and run against the local `art_gallery` DB
+- Shared `loginSchema` (email, password 1–72) and public `User` type (`id, name, email, role, createdAt, updatedAt`, no hash) in `shared/src/schemas/auth.ts`, exported from `shared/src/index.ts`
+- `utils/jwt.ts`: `signToken({ sub, role })` / `verifyToken(token)`, HS256 pinned on verify
+- `utils/auth-cookie.ts`: `setAuthCookie(res, token)` / `clearAuthCookie(res)`; cookie `token`, `httpOnly`, `sameSite: 'lax'`, `secure` in production, `path: '/'`, `maxAge` = `ms(JWT_EXPIRES_IN)`; clear uses identical options
+- `services/auth.service.ts`: `login(email, password)` (generic 401 "Invalid email or password", dummy-hash compare for unknown emails), `getUserById(id)`, `toPublicUser(user)`
+- Routes mounted at `/auth`: `POST /auth/login` (validated, 200 `User` + cookie), `POST /auth/logout` (204, cookie cleared), `GET /auth/me` (`requireAuth`, 200 `User`)
+- `requireAuth` middleware: missing/invalid token or deleted user → 401 `UNAUTHENTICATED`; sets `res.locals.user`
+- `requireRole('admin')` middleware: role mismatch → 403 `FORBIDDEN`
+- `server/src/types/express.d.ts` types `res.locals.user`
+- `seedAdmin()` in `server/src/db/seeds/admin.seed.ts` (bcrypt cost 12, only if the email doesn't exist), registered in `seed.ts`; running the seed twice leaves exactly one admin
+- Env: `JWT_SECRET`, `JWT_EXPIRES_IN`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_NAME` in `config/env.ts` and `server/.env.example`
+- Unit tests for `requireAuth`, `requireRole` and `auth.service.login` (DB, bcrypt, jsonwebtoken mocked); `npm test`, `npm run typecheck`, `npm run lint`, `npm run build` pass
+- Manual curl checks from the spec pass (login cookie flags, `/auth/me` with/without cookie, wrong password vs unknown email identical 401, logout → 204 then 401)
+
 ## Notes
 
 <!-- Additional context, constraints, or details from the spec. -->
+
+- Spec: `context/features/auth-phase-1-spec.md`. Registration (`POST /auth/register`) is **auth-phase-2**, not this phase
+- Verify installed versions / current docs (Context7) for `jsonwebtoken`, `bcrypt`, `ms`, TypeORM 1.1.1 and Express 5 before writing code
+- `user` is reserved in Postgres → `@Entity('users')`
+- `passwordHash` is `select: false`; login re-adds it with `addSelect`. Never return it in a response
+- Lower-case + trim email before lookup and insert
+- bcrypt reads only the first 72 bytes → passwords capped at 72 in schemas
+- Unknown email and wrong password return the identical message; run `bcrypt.compare` against a dummy hash when the user is missing (timing)
+- `jwt.verify(token, secret, { algorithms: ['HS256'] })`, always pin the algorithm
+- `JWT_EXPIRES_IN` (e.g. `1d`) feeds both `expiresIn` and the cookie `maxAge` (via `ms`), so they never drift
+- `clearCookie` must reuse the same `path` / `sameSite` / `secure` options
+- `bcrypt` is native: if install fails on Windows, check Node support and **ask before switching libraries**
+- Gotcha from setup-phase-3: generated migrations use a value `import { MigrationInterface, QueryRunner }`, which fails `verbatimModuleSyntax`. Change it to `import type` before the first `db:migrate`
+- DB operations run only against the local dev DB `art_gallery`; state the DB used
+- PowerShell: use `curl.exe`, not `curl` (alias for `Invoke-WebRequest`)
+- `JWT_SECRET` generation: `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"`; `ADMIN_PASSWORD` must be set in the local `server/.env`
 
 ## History
 
