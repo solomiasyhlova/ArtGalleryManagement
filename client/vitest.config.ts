@@ -10,5 +10,8 @@ export default defineProject({
   test: {
     name: 'client',
     environment: 'node',
+    env: {
+      VITE_API_URL: 'http://api.test',
+    },
   },
 });

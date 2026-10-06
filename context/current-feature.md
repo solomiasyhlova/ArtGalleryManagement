@@ -1,4 +1,4 @@
-# Current Feature
+# Current Feature: Setup - App Shell (Router, Providers & Layout)
 
 <!-- H1 gets the feature name when active, e.g. "# Current Feature: Add Navbar" -->
 
@@ -6,15 +6,36 @@
 
 <!-- Not Started | In Progress | Complete -->
 
-Not Started
+In Progress
 
 ## Goals
 
 <!-- Bullet points of what success looks like. Filled by `/feature load`. -->
 
+- React Router in data mode (`createBrowserRouter` + `RouterProvider`) in `client/src/router.tsx`: `/` → `GalleryPage`, `/login` and `/register` → placeholders, `*` → `NotFoundPage` (`/artworks/:id` comes in artwork-detail)
+- `AppLayout` route with `Header`, `<main>` + `<Outlet />` and `Footer`; the footer sticks to the bottom on short pages
+- `Header` (white, bottom border): lucide `Palette` icon + "ArtGalleryManager" wordmark linking to `/`, and an empty right-hand slot for the user menu
+- `Footer` (`bg-footer text-footer-foreground`): wordmark, tagline "Your go-to platform for managing and exploring exquisite art pieces.", and Facebook / X / Instagram icon links, each with an `aria-label`
+- `lib/query-client.ts`: `staleTime` 30s, `retry` once except for 401/403/404
+- `App.tsx` mounts `QueryClientProvider`, `RouterProvider` and one `<Toaster />`; `main.tsx` renders `App`
+- `lib/api.ts`: `api.get/post/put/delete<T>(path, body?)` over `fetch(VITE_API_URL + path, { credentials: 'include' })`, JSON in/out, 204 → `undefined`, non-2xx → `ApiError` (status, code, message, details) from the shared error shape, network failure → `ApiError` with code `NETWORK_ERROR`
+- `GalleryPage` placeholder: "Explore Our Collection" plus the API status from `GET /health` via `useQuery` (ok / error state)
+- `NotFoundPage`: a message and a link back to the gallery
+- Unit tests for `lib/api.ts` with mocked `fetch`: 2xx JSON, 204, error body → `ApiError`, network failure
+- No horizontal scroll at 375px; header and footer wrap cleanly
+- `npm test`, `npm run typecheck`, `npm run lint` and `npm run build` pass
+
 ## Notes
 
 <!-- Additional context, constraints, or details from the spec. -->
+
+- Spec: `context/features/setup-phase-5-spec.md`. Auth guards come in auth-phase-3; pages stay placeholders
+- Verify installed versions first (Context7 / package docs): React Router v7 imports from `react-router`, not `react-router-dom`. Data mode only: no `react-router.config.ts`, no React Router Vite plugin
+- TanStack Query v5: object signature `useQuery({ queryKey, queryFn })` only; mutations use `isPending`
+- `credentials: 'include'` on every request, or the auth cookie is never sent
+- lucide brand icons (Facebook, Instagram, Twitter) are deprecated: use them if the installed version still ships them, otherwise small inline SVGs
+- Sticky footer: `min-h-dvh flex flex-col` on the layout, `flex-1` on `<main>`
+- Use tokens only (no hex in components); merge classes with `cn()` from `@/lib/utils`
 
 ## History
 

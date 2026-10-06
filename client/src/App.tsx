@@ -1,11 +1,15 @@
-import { Button } from '@/components/ui/button';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { RouterProvider } from 'react-router/dom';
+import { Toaster } from '@/components/ui/sonner';
+import { queryClient } from '@/lib/query-client';
+import { router } from '@/router';
 
 function App() {
   return (
-    <main className="mx-auto flex max-w-5xl flex-col items-start gap-6 px-4 py-12">
-      <h1 className="text-3xl font-semibold">Explore Our Collection</h1>
-      <Button>Add New Artwork</Button>
-    </main>
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
+      <Toaster />
+    </QueryClientProvider>
   );
 }
 
