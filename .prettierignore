@@ -1,0 +1,7 @@
+dist/
+build/
+coverage/
+package-lock.json
+# hand-written docs and AI config: keep their manual table alignment
+*.md
+.claude/
