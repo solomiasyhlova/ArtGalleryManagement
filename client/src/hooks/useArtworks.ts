@@ -1,5 +1,5 @@
 import type { Artwork, ArtworkQuery, Paginated } from '@art-gallery/shared';
-import { queryOptions, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, queryOptions, useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 
 /** Filters, sort and page for `GET /artworks`. Omitted values use the API defaults. */
@@ -22,6 +22,7 @@ export function artworksQuery(params: ArtworkListParams) {
   });
 }
 
+/** Keeps showing the previous result while new params load, so paging doesn't flash skeletons. */
 export function useArtworks(params: ArtworkListParams = {}) {
-  return useQuery(artworksQuery(params));
+  return useQuery({ ...artworksQuery(params), placeholderData: keepPreviousData });
 }

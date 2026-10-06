@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { getErrorMessage } from '@/lib/form-errors';
+import { cn } from '@/lib/utils';
 import { ArtworkCard } from './ArtworkCard';
 import { ArtworkCardSkeleton } from './ArtworkCardSkeleton';
 
@@ -12,25 +13,43 @@ const SKELETON_COUNT = 8;
 interface ArtworkGridProps {
   /** `undefined` until the first successful load. */
   artworks: Artwork[] | undefined;
+  /** The artworks are the previous result while new filters or a new page load. */
+  isStale: boolean;
+  hasFilters: boolean;
+  onClearFilters: () => void;
   error: Error | null;
   onRetry: () => void;
   isRetrying: boolean;
 }
 
 /** Shows the artworks, or the loading, empty or error state. Data already loaded wins over a later error. */
-export function ArtworkGrid({ artworks, error, onRetry, isRetrying }: ArtworkGridProps) {
+export function ArtworkGrid({
+  artworks,
+  isStale,
+  hasFilters,
+  onClearFilters,
+  error,
+  onRetry,
+  isRetrying,
+}: ArtworkGridProps) {
   if (artworks) {
-    if (artworks.length === 0) {
-      return <p className="py-16 text-center text-muted-foreground">No artworks yet</p>;
-    }
     return (
-      <GridList>
-        {artworks.map((artwork) => (
-          <li key={artwork.id}>
-            <ArtworkCard artwork={artwork} />
-          </li>
-        ))}
-      </GridList>
+      <div
+        aria-busy={isStale}
+        className={cn('transition-opacity duration-150', isStale && 'opacity-60')}
+      >
+        {artworks.length === 0 ? (
+          <EmptyState hasFilters={hasFilters} onClearFilters={onClearFilters} />
+        ) : (
+          <GridList>
+            {artworks.map((artwork) => (
+              <li key={artwork.id}>
+                <ArtworkCard artwork={artwork} />
+              </li>
+            ))}
+          </GridList>
+        )}
+      </div>
     );
   }
 
@@ -60,6 +79,25 @@ export function ArtworkGrid({ artworks, error, onRetry, isRetrying }: ArtworkGri
           </li>
         ))}
       </GridList>
+    </div>
+  );
+}
+
+interface EmptyStateProps {
+  hasFilters: boolean;
+  onClearFilters: () => void;
+}
+
+function EmptyState({ hasFilters, onClearFilters }: EmptyStateProps) {
+  if (!hasFilters) {
+    return <p className="py-16 text-center text-muted-foreground">No artworks yet</p>;
+  }
+  return (
+    <div className="flex flex-col items-center gap-3 py-16 text-center">
+      <p className="text-muted-foreground">No artworks match your filters</p>
+      <Button variant="outline" onClick={onClearFilters}>
+        Clear filters
+      </Button>
     </div>
   );
 }

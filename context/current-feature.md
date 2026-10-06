@@ -1,4 +1,4 @@
-# Current Feature
+# Current Feature: Gallery - Filters, Sort & Pagination
 
 <!-- H1 gets the feature name when active, e.g. "# Current Feature: Add Navbar" -->
 
@@ -6,15 +6,49 @@
 
 <!-- Not Started | In Progress | Complete -->
 
-Not Started
+Complete
 
 ## Goals
 
 <!-- Bullet points of what success looks like. Filled by `/feature load`. -->
 
+- `ArtworkToolbar`: artist search (search icon, "Search by artist…", 300ms debounce, max 50 chars), type select ("All types" + `ARTWORK_TYPES` labels), "Sort by" select ("Newest" default / "Price: Low → High" `asc` / "Price: High → Low" `desc`), "Clear filters" link while any filter or sort is set, stacks vertically under `sm`, right-hand slot reserved for the admin "Add New Artwork" button (gallery-phase-3)
+- `useGalleryParams`: reads/writes `?artist=&type=&price=&page=` via `useSearchParams`; invalid values (`?type=pottery`, `?page=-1`) are ignored and never sent to the API; filter/sort changes reset `page` to 1 and drop empty params; search typing uses `replace`, other changes push a history entry
+- `GalleryPagination` below the grid: Previous / numbered pages with ellipsis / Next, hidden when `totalPages ≤ 1`; changing the page scrolls to the top of the grid
+- `placeholderData: keepPreviousData` (no skeleton flash between pages), grid dimmed while fetching
+- `page > totalPages` (edited URL, last item on a page deleted) → go to the last page
+- Empty state with active filters: "No artworks match your filters" + a "Clear filters" button
+- Pure, unit-tested helpers: `lib/gallery-params.ts` (parse/serialize) and `lib/pagination.ts` (page list with ellipsis)
+- `npm test`, `npm run typecheck`, `npm run lint` and `npm run build` pass; spec checks 1–9 verified in a real browser
+
 ## Notes
 
 <!-- Additional context, constraints, or details from the spec. -->
+
+- Spec: `context/features/gallery-phase-2-spec.md`
+- Create: `lib/gallery-params.ts` + test, `hooks/useGalleryParams.ts`, `hooks/useDebouncedValue.ts`, `lib/pagination.ts` + test, `components/artworks/ArtworkToolbar.tsx`, `components/artworks/GalleryPagination.tsx`
+- Modify: `pages/GalleryPage.tsx`, `components/artworks/ArtworkGrid.tsx` (filtered empty state, fetching dim), `hooks/useArtworks.ts` (`placeholderData`)
+- shadcn `select` and `pagination` are **not installed yet** (`components/ui` has badge/button/dropdown-menu/input/skeleton/sonner/label/avatar/card/field/separator/spinner). Verify shadcn 4 `radix-nova` conventions via Context7 before adding them
+- Radix `Select` rejects `""` as an item value: use a sentinel (`"all"`, `"newest"`) mapped to "no param"
+- Search input keeps its own state; sync URL → input only on external changes (back/forward, Clear filters), otherwise the input lags and the caret jumps
+- TanStack Query v5: `placeholderData: keepPreviousData` (imported helper), not `keepPreviousData: true`
+- Parse each URL param separately with `safeParse` so one bad param doesn't discard the others. Reuse the shared schema pieces (`ARTWORK_TYPES`, `PRICE_SORTS`, artist ≤ 50) rather than redefining rules
+- Existing pieces to build on: `useArtworks()` / `artworksPath()` / `artworksQuery()` (key `['artworks', params]`, `ArtworkListParams = Partial<ArtworkQuery>`), `ArtworkGrid` (loaded data wins over a refetch error; "No artworks yet" stays for the unfiltered empty case), `GalleryPage` passes props to the grid and now also `meta`
+- The API returns `totalPages: 0` for an empty result: don't treat that as `page > totalPages` (would redirect to page 0)
+- Installed: React Router **8.4** (imports from `react-router`), TanStack Query 5.104
+- Test 8 needs > 12 artworks: create them via the API and ask before deleting them afterwards. Browser checks use the real API (no stubbed responses)
+
+### Implementation notes
+
+- shadcn `select` + `pagination` added with `-c client` (the CLI refuses the monorepo root) and Prettier-formatted; the CLI's "overwrite button.tsx?" prompt was answered **no**. `PaginationLink` edited to render React Router's `Link` instead of `<a>` (a plain `<a>` reloads the SPA)
+- **React Router 8.4's `setSearchParams` updater gets the *rendered* `searchParams`, and the setter's identity changes on every URL change**, so the debounced search commits through `useEffectEvent` (React 19.3): a URL change alone never re-runs the commit with a stale value
+- `ArtistSearch` keeps its own input state; URL → input sync via the "adjust state during render" pattern, skipped when the URL only echoes the last debounced commit (keeps trailing spaces and newer keystrokes)
+- **Deviation**: starting a search pushes one history entry and refining it replaces that entry (spec: "typing uses replace"). With pure `replace`, the first search would overwrite the plain `/` entry and Back would leave the gallery
+- `parseGalleryParams` safe-parses each param with `artworkQuerySchema.shape.*`; `serializeGalleryParams` drops empty values and page 1; every write re-serializes the parsed values, so bad params disappear from the URL on the next change
+- Pagination: always 7 items past 7 pages (`getPageItems`), links with real `?page=` URLs; disabled Previous/Next are `aria-disabled` + `tabIndex=-1`; plain left clicks scroll to the grid (smooth unless reduced motion); modified clicks don't
+- Past-the-end page: shown as loading (no flash of an empty state) and `<Navigate replace>` to `meta.totalPages` once the non-placeholder result arrives; `totalPages: 0` never redirects
+- Grid dims (`opacity-60`, `aria-busy`) only while showing placeholder data (`isPlaceholderData`), not during background refetches of the same key
+- Verified in real Chrome (Playwright in the scratchpad, real API + `art_gallery`): spec checks 1–9 (55 assertions) incl. slow typing (330ms/key keeps "Alex Johnson" and the caret), Back/Forward input sync, page 99 → last page with the bad entry replaced, filter change → page 1, empty `?page=3&artist=zzz` stays, no skeleton flash under 800ms latency, 375px. 22 artworks "Pagination Test 01–22" were created via the API for check 8 and deleted via the API afterwards (22 × 204) with the user's OK
 
 ## History
 
