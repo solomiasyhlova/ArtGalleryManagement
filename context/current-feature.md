@@ -1,4 +1,4 @@
-# Current Feature
+# Current Feature: Artworks API - Create, Update & Delete (admin)
 
 <!-- H1 gets the feature name when active, e.g. "# Current Feature: Add Navbar" -->
 
@@ -6,15 +6,42 @@
 
 <!-- Not Started | In Progress | Complete -->
 
-Not Started
+In Progress
 
 ## Goals
 
 <!-- Bullet points of what success looks like. Filled by `/feature load`. -->
 
+- Shared `artworkInputSchema` + `ArtworkInput` type in `shared/src/schemas/artwork.ts`:
+  - `title`: trimmed string, 1–99 characters
+  - `artist`: trimmed string, 1–50 characters
+  - `type`: one of `ARTWORK_TYPES`
+  - `price`: JSON number, finite, > 0, at most 2 decimal places, ≤ 9,999,999,999.99 (fits `numeric(12,2)`)
+  - `availability`: optional boolean, default `true`
+  - `imageUrl`: optional `http(s)` URL ≤ 2048 characters; empty string → `null`
+- `POST /artworks` → 201 `Artwork`
+- `PUT /artworks/:id` → 200 `Artwork` (full replacement: omitted `availability` → `true`, omitted `imageUrl` → `null`), or 404
+- `DELETE /artworks/:id` → 204 (no body), or 404
+- All three routes: `requireAuth` → `requireRole('admin')` → `validate({ body })` (where there is a body)
+- Malformed UUID → 404 (same as `GET`); no cookie → 401; role `user` → 403
+- `artworks.service`: `create`, `update`, `remove`; controller + routes wired
+- Unit tests:
+  - schema: 99 vs 100 chars, whitespace-only title, price `0` / `-1` / `"4500"` / `10.999`, unknown type, `javascript:` URL
+  - service: create / update / delete, including the 404 paths
+- `npm test`, `npm run typecheck`, `npm run build` pass
+
 ## Notes
 
 <!-- Additional context, constraints, or details from the spec. -->
+
+- Spec: `context/features/artworks-phase-2-spec.md`. Verify Zod 4 / Express 5 / TypeORM 1.1 APIs against the installed versions (Context7) before relying on memory
+- Price must be a JSON number: `"4500"` → 400, no coercion (PDF "numeric only")
+- Trim before the length checks so `"   "` fails as "required"
+- `z.url()` alone accepts `javascript:` and similar; restrict the protocol to `http:` / `https:`
+- Middleware order `requireAuth` → `requireRole` → `validate`, so a `user` gets 403, not validation details
+- `PUT` replaces, never merges. Return the reloaded row so `updatedAt` (`@UpdateDateColumn`) is fresh
+- Files: `shared/src/schemas/artwork.ts` (+ test), `server/src/services/artworks.service.ts` (+ test), `server/src/controllers/artworks.controller.ts`, `server/src/routes/artworks.routes.ts`
+- Manual checks (curl against `art_gallery`, admin `cookies.txt` / user `user-cookies.txt`): PDF example → 201; `{"title":"","artist":"","type":"pottery","price":-5}` → 400 with all four fields; 100-char title → 400, 99 → 201; `PUT` full body → 200, unknown id → 404; `DELETE` → 204, again → 404; user → 403 on all three; no cookie → 401. Clean up test rows afterwards (ask first: it's a `DELETE`)
 
 ## History
 

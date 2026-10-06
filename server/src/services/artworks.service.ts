@@ -1,5 +1,6 @@
 import {
   ERROR_CODES,
+  type ArtworkInput,
   type ArtworkQuery,
   type Artwork as PublicArtwork,
   type Paginated,
@@ -17,6 +18,10 @@ const idSchema = z.guid();
 
 function artworkNotFound(): HttpError {
   return new HttpError(404, ERROR_CODES.NOT_FOUND, 'Artwork not found');
+}
+
+function assertValidId(id: string): void {
+  if (!idSchema.safeParse(id).success) throw artworkNotFound();
 }
 
 export function toPublicArtwork(artwork: Artwork): PublicArtwork {
@@ -69,9 +74,38 @@ export async function listArtworks({
 }
 
 export async function getArtworkById(id: string): Promise<PublicArtwork> {
-  if (!idSchema.safeParse(id).success) throw artworkNotFound();
+  assertValidId(id);
 
   const artwork = await artworks().findOneBy({ id });
   if (!artwork) throw artworkNotFound();
   return toPublicArtwork(artwork);
+}
+
+/** `save` returns the row with the generated id and timestamps (Postgres `RETURNING`). */
+export async function createArtwork(input: ArtworkInput): Promise<PublicArtwork> {
+  const repository = artworks();
+  return toPublicArtwork(await repository.save(repository.create(input)));
+}
+
+/**
+ * Full replacement: every field is written, so omitted optional fields fall back to the schema
+ * defaults instead of keeping old values. A single `UPDATE` (not find + `save`, which would
+ * insert a row deleted in between) sets `updated_at`, then the row is reloaded with it.
+ */
+export async function updateArtwork(id: string, input: ArtworkInput): Promise<PublicArtwork> {
+  assertValidId(id);
+
+  const { affected } = await artworks().update({ id }, input);
+  if (!affected) throw artworkNotFound();
+
+  const artwork = await artworks().findOneBy({ id });
+  if (!artwork) throw artworkNotFound();
+  return toPublicArtwork(artwork);
+}
+
+export async function deleteArtwork(id: string): Promise<void> {
+  assertValidId(id);
+
+  const { affected } = await artworks().delete({ id });
+  if (!affected) throw artworkNotFound();
 }

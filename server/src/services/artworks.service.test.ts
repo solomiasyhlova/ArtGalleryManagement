@@ -1,8 +1,15 @@
-import { DEFAULT_PAGE_SIZE, type ArtworkQuery } from '@art-gallery/shared';
+import { DEFAULT_PAGE_SIZE, type ArtworkInput, type ArtworkQuery } from '@art-gallery/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Artwork } from '../entities/Artwork.js';
 import { HttpError } from '../utils/http-error.js';
-import { getArtworkById, listArtworks, toPublicArtwork } from './artworks.service.js';
+import {
+  createArtwork,
+  deleteArtwork,
+  getArtworkById,
+  listArtworks,
+  toPublicArtwork,
+  updateArtwork,
+} from './artworks.service.js';
 
 const { queryBuilder, repository } = vi.hoisted(() => {
   const queryBuilder = {
@@ -18,6 +25,10 @@ const { queryBuilder, repository } = vi.hoisted(() => {
     repository: {
       createQueryBuilder: vi.fn(() => queryBuilder),
       findOneBy: vi.fn(),
+      create: vi.fn((input: object) => ({ ...input })),
+      save: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
     },
   };
 });
@@ -28,7 +39,7 @@ vi.mock('../db/data-source.js', () => ({
 
 const ID = '6f1c2d3e-4b5a-4c6d-8e7f-0a1b2c3d4e5f';
 
-function createArtwork(overrides: Partial<Artwork> = {}): Artwork {
+function buildArtwork(overrides: Partial<Artwork> = {}): Artwork {
   return Object.assign(
     {
       id: ID,
@@ -48,6 +59,17 @@ function createArtwork(overrides: Partial<Artwork> = {}): Artwork {
 function query(overrides: Partial<ArtworkQuery> = {}): ArtworkQuery {
   return { page: 1, limit: DEFAULT_PAGE_SIZE, ...overrides };
 }
+
+const INPUT: ArtworkInput = {
+  title: 'Sunset Over the Ocean',
+  artist: 'Claude Monet',
+  type: 'painting',
+  price: 4500,
+  availability: true,
+  imageUrl: null,
+};
+
+const MALFORMED_IDS = ['3', 'not-a-uuid', `${ID}0`, ID.replaceAll('-', ''), ''];
 
 describe('artworks.service', () => {
   beforeEach(() => {
@@ -145,18 +167,18 @@ describe('artworks.service', () => {
     });
 
     it('returns public artworks with ISO dates', async () => {
-      queryBuilder.getManyAndCount.mockResolvedValue([[createArtwork()], 1]);
+      queryBuilder.getManyAndCount.mockResolvedValue([[buildArtwork()], 1]);
 
       const result = await listArtworks(query());
 
-      expect(result.data).toEqual([toPublicArtwork(createArtwork())]);
+      expect(result.data).toEqual([toPublicArtwork(buildArtwork())]);
       expect(result.data[0]?.createdAt).toBe('2026-01-01T00:00:00.000Z');
     });
   });
 
   describe('getArtworkById', () => {
     it('returns the public artwork', async () => {
-      repository.findOneBy.mockResolvedValue(createArtwork());
+      repository.findOneBy.mockResolvedValue(buildArtwork());
 
       const artwork = await getArtworkById(ID);
 
@@ -173,7 +195,7 @@ describe('artworks.service', () => {
       expect(error).toMatchObject({ status: 404, code: 'NOT_FOUND', message: 'Artwork not found' });
     });
 
-    it.each(['3', 'not-a-uuid', `${ID}0`, ID.replaceAll('-', ''), ''])(
+    it.each(MALFORMED_IDS)(
       'throws 404 for the malformed id %j without querying the database',
       async (id) => {
         await expect(getArtworkById(id)).rejects.toMatchObject({ status: 404, code: 'NOT_FOUND' });
@@ -182,9 +204,98 @@ describe('artworks.service', () => {
     );
   });
 
+  describe('createArtwork', () => {
+    it('saves the input and returns the stored row', async () => {
+      const saved = buildArtwork({ ...INPUT });
+      repository.save.mockResolvedValue(saved);
+
+      const artwork = await createArtwork(INPUT);
+
+      expect(repository.create).toHaveBeenCalledWith(INPUT);
+      expect(repository.save).toHaveBeenCalledWith(INPUT);
+      expect(artwork).toEqual(toPublicArtwork(saved));
+    });
+
+    it('passes database errors through', async () => {
+      const failure = new Error('connection lost');
+      repository.save.mockRejectedValue(failure);
+
+      await expect(createArtwork(INPUT)).rejects.toBe(failure);
+    });
+  });
+
+  describe('updateArtwork', () => {
+    it('writes every field and returns the reloaded row', async () => {
+      const reloaded = buildArtwork({ ...INPUT, updatedAt: new Date('2026-02-01T00:00:00.000Z') });
+      repository.update.mockResolvedValue({ affected: 1 });
+      repository.findOneBy.mockResolvedValue(reloaded);
+
+      const artwork = await updateArtwork(ID, INPUT);
+
+      expect(repository.update).toHaveBeenCalledWith({ id: ID }, INPUT);
+      expect(repository.findOneBy).toHaveBeenCalledWith({ id: ID });
+      expect(repository.update.mock.invocationCallOrder[0]).toBeLessThan(
+        repository.findOneBy.mock.invocationCallOrder[0] ?? 0,
+      );
+      expect(artwork).toEqual(toPublicArtwork(reloaded));
+      expect(artwork.updatedAt).toBe('2026-02-01T00:00:00.000Z');
+    });
+
+    it('throws 404 when no row was updated', async () => {
+      repository.update.mockResolvedValue({ affected: 0 });
+
+      const error = await updateArtwork(ID, INPUT).catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(HttpError);
+      expect(error).toMatchObject({ status: 404, code: 'NOT_FOUND', message: 'Artwork not found' });
+      expect(repository.findOneBy).not.toHaveBeenCalled();
+    });
+
+    it('throws 404 when the row is deleted before it is reloaded', async () => {
+      repository.update.mockResolvedValue({ affected: 1 });
+      repository.findOneBy.mockResolvedValue(null);
+
+      await expect(updateArtwork(ID, INPUT)).rejects.toMatchObject({ status: 404 });
+    });
+
+    it.each(MALFORMED_IDS)(
+      'throws 404 for the malformed id %j without querying the database',
+      async (id) => {
+        await expect(updateArtwork(id, INPUT)).rejects.toMatchObject({ status: 404 });
+        expect(repository.update).not.toHaveBeenCalled();
+      },
+    );
+  });
+
+  describe('deleteArtwork', () => {
+    it('deletes the row by id', async () => {
+      repository.delete.mockResolvedValue({ affected: 1 });
+
+      await expect(deleteArtwork(ID)).resolves.toBeUndefined();
+      expect(repository.delete).toHaveBeenCalledWith({ id: ID });
+    });
+
+    it('throws 404 when no row was deleted', async () => {
+      repository.delete.mockResolvedValue({ affected: 0 });
+
+      const error = await deleteArtwork(ID).catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(HttpError);
+      expect(error).toMatchObject({ status: 404, code: 'NOT_FOUND', message: 'Artwork not found' });
+    });
+
+    it.each(MALFORMED_IDS)(
+      'throws 404 for the malformed id %j without querying the database',
+      async (id) => {
+        await expect(deleteArtwork(id)).rejects.toMatchObject({ status: 404 });
+        expect(repository.delete).not.toHaveBeenCalled();
+      },
+    );
+  });
+
   describe('toPublicArtwork', () => {
     it('copies the public fields and serializes dates', () => {
-      expect(toPublicArtwork(createArtwork({ imageUrl: 'https://example.com/a.jpg' }))).toEqual({
+      expect(toPublicArtwork(buildArtwork({ imageUrl: 'https://example.com/a.jpg' }))).toEqual({
         id: ID,
         title: 'Geometric Harmony',
         artist: 'Liam Smith',
