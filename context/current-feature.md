@@ -1,4 +1,4 @@
-# Current Feature: Auth API - Registration (auth-phase-2)
+# Current Feature
 
 <!-- H1 gets the feature name when active, e.g. "# Current Feature: Add Navbar" -->
 
@@ -6,34 +6,15 @@
 
 <!-- Not Started | In Progress | Complete -->
 
-In Progress
+Not Started
 
 ## Goals
 
 <!-- Bullet points of what success looks like. Filled by `/feature load`. -->
 
-- `registerSchema` + `RegisterInput` in `shared/src/schemas/auth.ts`: `name`, `email`, `password`, `confirmPassword`, reusing the existing `nameSchema` / `emailSchema` / `passwordSchema`; mismatch error on `confirmPassword`
-- `register({ name, email, password })` in `auth.service`: 409 `EMAIL_TAKEN` with `details.email` if the email exists, bcrypt hash (cost 12, `BCRYPT_ROUNDS`), role always `user`, returns the public `User` (no hash)
-- Concurrent-insert race: Postgres unique violation `23505` on insert maps to the same 409
-- `register` controller handler sets the auth cookie and returns 201 `User`
-- `POST /auth/register` route with `validate(registerSchema)`
-- Unit tests: schema (mismatch, short password, bad email, `role` stripped) and service (409 on existing email, 409 on `23505`, forced `user` role, no hash returned)
-- Manual curl checks from the spec pass (201 + cookie, lower-cased email, 409 repeat, 400 `details.confirmPassword`, `role: admin` ignored, `/auth/me`, login with the new account)
-
 ## Notes
 
 <!-- Additional context, constraints, or details from the spec. -->
-
-- Spec: `context/features/auth-phase-2-spec.md`
-- `role` in the body must be ignored: keep the default `z.object` (strips unknown keys). Never `.passthrough()` / `z.looseObject`
-- Match check via `.refine` / `.superRefine` with `path: ['confirmPassword']`
-- Zod 4: use top-level `z.email()` (already the case in `emailSchema`)
-- The service only receives `{ name, email, password }`; `confirmPassword` never reaches the DB layer
-- Email uniqueness is case-insensitive because `emailSchema` trims + lower-cases before lookup/insert (and the DB has `CHECK (email = lower(email))`)
-- `shared/src/schemas/auth.test.ts` already exists from auth-phase-1 (the spec lists it under "create"): extend it rather than create it
-- Reuse existing helpers: `hashPassword`, `toPublicUser`, `normalizeEmail`, cookie helper, `HttpError`, `ERROR_CODES.EMAIL_TAKEN`
-- No schema change expected (the `users` table already exists), so no migration
-- Manual checks run against the local dev DB `art_gallery` only; test accounts created there may need cleanup (ask before any `DELETE`)
 
 ## History
 
@@ -47,3 +28,4 @@ In Progress
 - Setup - App Shell (setup-phase-5): **React Router 8.4** is installed (the spec says v7). Data mode with `createBrowserRouter` in `router.tsx`; `RouterProvider` now comes from `react-router/dom`, everything else from `react-router` (`react-router-dom` is gone in v8). An `AppLayout` route (Header / `main` + `Outlet` / Footer; sticky footer via `min-h-dvh flex flex-col` + `flex-1`) wraps the `/`, `/login`, `/register` placeholders and `*` → `NotFoundPage`. Header: `Palette` + wordmark, empty user-menu slot. Footer social links are inline stroke SVGs because **lucide 1.x has no brand icons**. TanStack Query 5.104: `queryClient` with `staleTime` 30s and exported `shouldRetry` (one retry, never on 401/403/404). `lib/api.ts`: client-local `ApiError` (status, code, message, details; not from `shared` for now), `credentials: 'include'`, `Content-Type` only with a body, 204 → `undefined`, non-standard error bodies → `UNKNOWN_ERROR`, fetch failure → `NETWORK_ERROR` (status 0). It **throws on import if `VITE_API_URL` is missing** (at runtime, not build time), so the client Vitest project sets `test.env.VITE_API_URL`. `vite-env.d.ts` types the env var; local `client/.env` copied from `.env.example`. The `GalleryPage` placeholder shows the `/health` status. Verified in a real browser with Playwright (installed in the scratchpad, system Chrome): happy path, 404 flow, 375px, a real 503 with Postgres stopped and a real network failure with the API stopped. No-retry on 401/403/404 is unit-tested only until an endpoint can return them
 - Auth API - User Model, Login & Session (auth-phase-1): `bcrypt` 6 (N-API prebuilds, no compiling; install script approved in root `allowScripts`), `jsonwebtoken` 9, `ms` 2. `User` entity → table `users` with **snake_case columns** (`password_hash`, `created_at`, `updated_at`), `user_role` enum, unique email + `CHECK (email = lower(email))`, `passwordHash` `select: false`. Column `type`s are always explicit because tsx/esbuild emit no decorator metadata. **TypeORM runs `CREATE EXTENSION "uuid-ossp"` on connect by default** (it did so once in `art_gallery`, extension still installed): the data source now sets `uuidExtension: 'pgcrypto'` (→ built-in `gen_random_uuid()`) and `installExtensions: false`. Run Prettier on generated migrations **before** `db:migrate`. Shared `emailSchema` (trim + lower-case, then `z.email()` via `.pipe`), `passwordSchema` (8 chars, ≤ 72 **UTF-8 bytes** via the portable `utf8ByteLength()`; bcrypt silently truncates), `nameSchema`, `loginSchema`, public `User` interface. `signToken`/`verifyToken` (HS256 pinned, Zod-checked `{ sub: uuid, role }`, returns `null` on any `JsonWebTokenError`); cookie helpers share one options object, `maxAge = ms(JWT_EXPIRES_IN)`. `auth.service`: generic 401 + dummy-hash compare (a test ties its cost to the exported `BCRYPT_ROUNDS`), `getUserById`, `toPublicUser`, `hashPassword`, `normalizeEmail`. `POST /auth/login`, `POST /auth/logout`, `GET /auth/me`. `requireAuth` takes the role from the DB, not the token; `requireRole(role)` fails closed with 401 when no user is loaded. `res.locals.user` typed via `types/express.d.ts`. Env: `JWT_SECRET` (≥ 32), `JWT_EXPIRES_IN` (`ms` duration ≥ 1s), `ADMIN_*` optional (only `seedAdmin` needs them; it throws if missing). Tests import modules that read `env` only with `vi.mock('../config/env.js')`. JWT tests use the real `jsonwebtoken` to prove HS512/`alg: none` rejection. Verified with curl: cookie flags, `/auth/me` with/without cookie, identical 401s with similar timing, logout, tampered and `alg: none` tokens. `npm audit` now also reports a critical `shell-quote` via `concurrently` (dev tooling, not addressed)
 - Fix - Remove uuid-ossp, patch shell-quote: dropped the `uuid-ossp` extension that TypeORM auto-installed in the local `art_gallery` DB during auth-phase-1 with a one-off `DROP EXTENSION IF EXISTS "uuid-ossp"` (user chose no migration: none ever created it; 0 dependents, `users.id` keeps `gen_random_uuid()`). `concurrently@10.0.5` (latest) pins `shell-quote@1.9.0` (critical GHSA-pqg4-j6r4-53mv); root `overrides` `{ "concurrently": { "shell-quote": "^1.11.0" } }` → 1.12.0 instead of npm audit's downgrade to concurrently 9.2.1. `concurrently` only uses `quote()` (API unchanged). **Remove the override once concurrently ships a patched shell-quote.** `npm audit` is back to the known 7 highs from the `shadcn` CLI (`braces` chain)
+- Auth API - Registration (auth-phase-2): `POST /auth/register` → 201 public `User` + auth cookie. Shared `registerSchema` / `RegisterInput` reuse `nameSchema` / `emailSchema` / `passwordSchema` plus `confirmPassword` (`min(1)` "Please confirm your password"); `role` is stripped by the default `z.object`. **Zod 4 skips object refinements after aborting issues** (e.g. a missing `name`), so the match `.refine` uses `when` (both passwords strings, confirmation non-empty) to report "Passwords do not match" on `confirmPassword` next to other field errors, never on top of an empty confirmation. `register({ name, email, password })` (type `NewUser`, no `confirmPassword`): `existsBy` on the lower-cased email → 409 `EMAIL_TAKEN` with `details.email` before hashing, bcrypt cost 12, role hard-coded `user`, `save(create(...))` so the generated id and timestamps come back (`insert` doesn't return them). A `QueryFailedError` with `driverError.code === '23505'` from concurrent sign-ups maps to the same 409; other DB errors are rethrown. Tests: schema (mismatch, mismatch alongside other errors, empty confirmation, password rules, bad email, `role` stripped, non-object bodies) and service (both 409 paths, forced role, normalized lookup, no hash returned, rethrow). Verified with curl against `art_gallery` (spec checks + 3 concurrent sign-ups → 201/409/409 via a real `23505`); test users deleted afterwards. Not addressed: no rate limiting on `/auth/register` / `/auth/login` (bcrypt cost per call), and TypeORM's dev query logging prints INSERT parameters, including bcrypt hashes
