@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { emailSchema, loginSchema, nameSchema, passwordSchema, utf8ByteLength } from './auth.js';
+import {
+  emailSchema,
+  loginSchema,
+  nameSchema,
+  passwordSchema,
+  registerSchema,
+  utf8ByteLength,
+} from './auth.js';
 
 describe('emailSchema', () => {
   it('trims and lower-cases before validating', () => {
@@ -100,5 +107,79 @@ describe('loginSchema', () => {
     expect(loginSchema.parse({ email: 'a@b.co', password: 'x', role: 'admin' })).not.toHaveProperty(
       'role',
     );
+  });
+});
+
+describe('registerSchema', () => {
+  const valid = {
+    name: 'Test User',
+    email: 'test@example.com',
+    password: 'password123',
+    confirmPassword: 'password123',
+  };
+
+  const fieldErrors = (input: unknown) =>
+    registerSchema
+      .safeParse(input)
+      .error?.issues.map((issue) => [issue.path.join('.'), issue.message]);
+
+  it('trims the name and normalizes the email', () => {
+    expect(
+      registerSchema.parse({ ...valid, name: ' Test User ', email: ' Test@Example.com' }),
+    ).toEqual(valid);
+  });
+
+  it('strips a role from the body', () => {
+    expect(registerSchema.parse({ ...valid, role: 'admin' })).not.toHaveProperty('role');
+  });
+
+  it('reports mismatched passwords on confirmPassword', () => {
+    expect(fieldErrors({ ...valid, confirmPassword: 'password124' })).toEqual([
+      ['confirmPassword', 'Passwords do not match'],
+    ]);
+  });
+
+  it('reports a mismatch alongside errors in other fields', () => {
+    expect(
+      fieldErrors({ email: 'test@example.com', password: 'password123', confirmPassword: 'x' }),
+    ).toEqual([
+      ['name', 'Name is required'],
+      ['confirmPassword', 'Passwords do not match'],
+    ]);
+  });
+
+  it('asks for the confirmation instead of reporting a mismatch when it is empty', () => {
+    expect(fieldErrors({ ...valid, confirmPassword: '' })).toEqual([
+      ['confirmPassword', 'Please confirm your password'],
+    ]);
+    expect(fieldErrors({ ...valid, confirmPassword: undefined })).toEqual([
+      ['confirmPassword', 'Please confirm your password'],
+    ]);
+  });
+
+  it('applies the new-password rules', () => {
+    expect(fieldErrors({ ...valid, password: 'short', confirmPassword: 'short' })).toEqual([
+      ['password', 'Password must be at least 8 characters'],
+    ]);
+    const tooLong = 'é'.repeat(37);
+    expect(
+      registerSchema.safeParse({ ...valid, password: tooLong, confirmPassword: tooLong }).success,
+    ).toBe(false);
+  });
+
+  it('rejects an invalid email', () => {
+    expect(fieldErrors({ ...valid, email: 'not-an-email' })).toEqual([
+      ['email', 'Enter a valid email address'],
+    ]);
+  });
+
+  it('rejects a name longer than 50 characters', () => {
+    expect(registerSchema.safeParse({ ...valid, name: 'a'.repeat(51) }).success).toBe(false);
+  });
+
+  it.each([undefined, null, 'nope'])('rejects %j as the body without throwing', (input) => {
+    expect(fieldErrors(input)).toEqual([
+      ['', expect.stringMatching(/^Invalid input: expected object/)],
+    ]);
   });
 });

@@ -1,10 +1,11 @@
 import type bcrypt from 'bcrypt';
+import { QueryFailedError } from 'typeorm';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { User } from '../entities/User.js';
 import { HttpError } from '../utils/http-error.js';
-import { BCRYPT_ROUNDS, getUserById, login, toPublicUser } from './auth.service.js';
+import { BCRYPT_ROUNDS, getUserById, login, register, toPublicUser } from './auth.service.js';
 
-const { queryBuilder, repository, compare } = vi.hoisted(() => {
+const { queryBuilder, repository, compare, hash } = vi.hoisted(() => {
   const queryBuilder = {
     addSelect: vi.fn().mockReturnThis(),
     where: vi.fn().mockReturnThis(),
@@ -12,8 +13,15 @@ const { queryBuilder, repository, compare } = vi.hoisted(() => {
   };
   return {
     queryBuilder,
-    repository: { createQueryBuilder: vi.fn(() => queryBuilder), findOneBy: vi.fn() },
+    repository: {
+      createQueryBuilder: vi.fn(() => queryBuilder),
+      findOneBy: vi.fn(),
+      existsBy: vi.fn(),
+      create: vi.fn((fields: object) => ({ ...fields })),
+      save: vi.fn(),
+    },
     compare: vi.fn(),
+    hash: vi.fn(),
   };
 });
 
@@ -21,7 +29,7 @@ vi.mock('../db/data-source.js', () => ({
   AppDataSource: { getRepository: () => repository },
 }));
 
-vi.mock('bcrypt', () => ({ default: { compare, hash: vi.fn() } }));
+vi.mock('bcrypt', () => ({ default: { compare, hash } }));
 
 function createUser(overrides: Partial<User> = {}): User {
   return Object.assign(
@@ -120,6 +128,88 @@ describe('auth.service', () => {
       await expect(login('nobody@gallery.local', 'whatever')).rejects.toMatchObject({
         status: 401,
       });
+    });
+  });
+
+  describe('register', () => {
+    const input = { name: 'Test User', email: 'Test@Example.com', password: 'password123' };
+
+    function uniqueViolation(): QueryFailedError {
+      return new QueryFailedError(
+        'INSERT INTO "users" ...',
+        [],
+        Object.assign(new Error('duplicate key'), { code: '23505' }),
+      );
+    }
+
+    beforeEach(() => {
+      repository.existsBy.mockResolvedValue(false);
+      hash.mockResolvedValue('$2b$12$newhash');
+      repository.save.mockImplementation((fields: Partial<User>) =>
+        Promise.resolve(createUser({ ...fields })),
+      );
+    });
+
+    it('hashes the password, forces the user role and returns the public user', async () => {
+      const user = await register(input);
+
+      expect(hash).toHaveBeenCalledWith('password123', BCRYPT_ROUNDS);
+      expect(repository.save).toHaveBeenCalledWith({
+        name: 'Test User',
+        email: 'test@example.com',
+        passwordHash: '$2b$12$newhash',
+        role: 'user',
+      });
+      expect(user).toMatchObject({ name: 'Test User', email: 'test@example.com', role: 'user' });
+      expect(user).not.toHaveProperty('passwordHash');
+    });
+
+    it('ignores a role smuggled into the input', async () => {
+      await register({ ...input, role: 'admin' } as typeof input);
+
+      expect(repository.save).toHaveBeenCalledWith(expect.objectContaining({ role: 'user' }));
+    });
+
+    it('checks for an existing account by the normalized email', async () => {
+      await register(input);
+
+      expect(repository.existsBy).toHaveBeenCalledWith({ email: 'test@example.com' });
+    });
+
+    it('rejects a taken email with 409 before hashing or inserting', async () => {
+      repository.existsBy.mockResolvedValue(true);
+
+      const error = await register(input).catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(HttpError);
+      expect(error).toMatchObject({
+        status: 409,
+        code: 'EMAIL_TAKEN',
+        details: { email: ['An account with this email already exists'] },
+      });
+      expect(hash).not.toHaveBeenCalled();
+      expect(repository.save).not.toHaveBeenCalled();
+    });
+
+    it('maps a unique violation from a concurrent insert to the same 409', async () => {
+      repository.save.mockRejectedValue(uniqueViolation());
+
+      await expect(register(input)).rejects.toMatchObject({
+        status: 409,
+        code: 'EMAIL_TAKEN',
+        details: { email: ['An account with this email already exists'] },
+      });
+    });
+
+    it('rethrows other database errors', async () => {
+      const failure = new QueryFailedError(
+        'INSERT INTO "users" ...',
+        [],
+        Object.assign(new Error('check violation'), { code: '23514' }),
+      );
+      repository.save.mockRejectedValue(failure);
+
+      await expect(register(input)).rejects.toBe(failure);
     });
   });
 

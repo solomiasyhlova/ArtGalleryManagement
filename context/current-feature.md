@@ -1,4 +1,4 @@
-# Current Feature
+# Current Feature: Auth API - Registration (auth-phase-2)
 
 <!-- H1 gets the feature name when active, e.g. "# Current Feature: Add Navbar" -->
 
@@ -6,15 +6,34 @@
 
 <!-- Not Started | In Progress | Complete -->
 
-Not Started
+In Progress
 
 ## Goals
 
 <!-- Bullet points of what success looks like. Filled by `/feature load`. -->
 
+- `registerSchema` + `RegisterInput` in `shared/src/schemas/auth.ts`: `name`, `email`, `password`, `confirmPassword`, reusing the existing `nameSchema` / `emailSchema` / `passwordSchema`; mismatch error on `confirmPassword`
+- `register({ name, email, password })` in `auth.service`: 409 `EMAIL_TAKEN` with `details.email` if the email exists, bcrypt hash (cost 12, `BCRYPT_ROUNDS`), role always `user`, returns the public `User` (no hash)
+- Concurrent-insert race: Postgres unique violation `23505` on insert maps to the same 409
+- `register` controller handler sets the auth cookie and returns 201 `User`
+- `POST /auth/register` route with `validate(registerSchema)`
+- Unit tests: schema (mismatch, short password, bad email, `role` stripped) and service (409 on existing email, 409 on `23505`, forced `user` role, no hash returned)
+- Manual curl checks from the spec pass (201 + cookie, lower-cased email, 409 repeat, 400 `details.confirmPassword`, `role: admin` ignored, `/auth/me`, login with the new account)
+
 ## Notes
 
 <!-- Additional context, constraints, or details from the spec. -->
+
+- Spec: `context/features/auth-phase-2-spec.md`
+- `role` in the body must be ignored: keep the default `z.object` (strips unknown keys). Never `.passthrough()` / `z.looseObject`
+- Match check via `.refine` / `.superRefine` with `path: ['confirmPassword']`
+- Zod 4: use top-level `z.email()` (already the case in `emailSchema`)
+- The service only receives `{ name, email, password }`; `confirmPassword` never reaches the DB layer
+- Email uniqueness is case-insensitive because `emailSchema` trims + lower-cases before lookup/insert (and the DB has `CHECK (email = lower(email))`)
+- `shared/src/schemas/auth.test.ts` already exists from auth-phase-1 (the spec lists it under "create"): extend it rather than create it
+- Reuse existing helpers: `hashPassword`, `toPublicUser`, `normalizeEmail`, cookie helper, `HttpError`, `ERROR_CODES.EMAIL_TAKEN`
+- No schema change expected (the `users` table already exists), so no migration
+- Manual checks run against the local dev DB `art_gallery` only; test accounts created there may need cleanup (ask before any `DELETE`)
 
 ## History
 

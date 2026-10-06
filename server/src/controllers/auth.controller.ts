@@ -1,8 +1,15 @@
-import type { LoginInput } from '@art-gallery/shared';
+import type { LoginInput, RegisterInput } from '@art-gallery/shared';
 import type { RequestHandler } from 'express';
 import * as authService from '../services/auth.service.js';
 import { clearAuthCookie, setAuthCookie } from '../utils/auth-cookie.js';
 import { signToken } from '../utils/jwt.js';
+
+export const register: RequestHandler = async (_req, res) => {
+  const { name, email, password } = res.locals.validated.body as RegisterInput;
+  const user = await authService.register({ name, email, password });
+  setAuthCookie(res, signToken({ sub: user.id, role: user.role }));
+  res.status(201).json(user);
+};
 
 export const login: RequestHandler = async (_req, res) => {
   const { email, password } = res.locals.validated.body as LoginInput;

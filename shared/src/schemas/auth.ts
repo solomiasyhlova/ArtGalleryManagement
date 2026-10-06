@@ -47,3 +47,27 @@ export const loginSchema = z.object({
 });
 
 export type LoginInput = z.infer<typeof loginSchema>;
+
+/** Unknown keys (e.g. `role`) are stripped, so a sign-up can never choose its own role. */
+export const registerSchema = z
+  .object({
+    name: nameSchema,
+    email: emailSchema,
+    password: passwordSchema,
+    confirmPassword: z
+      .string({ error: 'Please confirm your password' })
+      .min(1, 'Please confirm your password'),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: 'Passwords do not match',
+    path: ['confirmPassword'],
+    // Report a mismatch next to other field errors, but not on top of "Please confirm".
+    when: ({ value }) => {
+      const { password, confirmPassword } = (value ?? {}) as Record<string, unknown>;
+      return (
+        typeof password === 'string' && typeof confirmPassword === 'string' && !!confirmPassword
+      );
+    },
+  });
+
+export type RegisterInput = z.infer<typeof registerSchema>;
