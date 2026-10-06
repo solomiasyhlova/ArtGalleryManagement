@@ -1,4 +1,4 @@
-# Current Feature: Fix - Redact Error Logs
+# Current Feature
 
 <!-- H1 gets the feature name when active, e.g. "# Current Feature: Add Navbar" -->
 
@@ -6,31 +6,15 @@
 
 <!-- Not Started | In Progress | Complete -->
 
-Complete
+Not Started
 
 ## Goals
 
 <!-- Bullet points of what success looks like. Filled by `/feature load`. -->
 
-- Unknown errors reaching `errorHandler` (500) and a failed seed never log bound query
-  parameters or row values: no email, name or bcrypt hash in the logs
-- One shared `logError()` in `server/src/utils/` with an allowlist of safe fields
-  (`name`, `message`, `code`, `stack`, plus the Postgres `constraint` / `table` / `column`
-  and the parameterized SQL text)
-- Render-friendly output: in production each error is one single-line JSON entry, so the
-  stack stays in one log entry instead of one entry per line
-- Tests for the redaction and the error handler's use of it
-
 ## Notes
 
 <!-- Additional context, constraints, or details from the spec. -->
-
-- Found by the code-scanner audit (L1). TypeORM 1.1.1's `QueryFailedError` stores
-  `query` + `parameters` and copies every `driverError` field onto itself, including
-  Postgres's `detail` (`Key (email)=(…) already exists`, `Failing row contains (…)` with the
-  hash), so a blocklist would miss fields: use an allowlist
-- Redaction must not depend on `NODE_ENV` (a Render service may run without it set); only
-  the output format does
 
 ## History
 
