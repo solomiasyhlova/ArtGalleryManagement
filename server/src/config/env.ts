@@ -5,6 +5,7 @@ const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   // Normalized to the bare origin so it matches the browser's `Origin` header for CORS.
   CLIENT_URL: z.url({ protocol: /^https?$/ }).transform((url) => new URL(url).origin),
+  DATABASE_URL: z.url({ protocol: /^postgres(ql)?$/ }),
 });
 
 export type Env = z.infer<typeof envSchema>;
