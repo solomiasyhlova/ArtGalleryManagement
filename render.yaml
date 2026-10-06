@@ -1,0 +1,49 @@
+# Render Blueprint: one free web service serves the API and the built client from one origin
+# (separate *.onrender.com subdomains are cross-site, which breaks the lax auth cookie).
+# Setup, values to enter and free-plan limits: see "Deploy to Render" in README.md.
+
+databases:
+  - name: art-gallery-db
+    plan: free
+    region: frankfurt
+    databaseName: art_gallery
+    postgresMajorVersion: '18'
+
+services:
+  - type: web
+    name: art-gallery
+    runtime: node
+    plan: free
+    region: frankfurt
+    # Node 24 ships npm 11 and the repo needs npm 12. Env vars exist at build time and
+    # NODE_ENV=production would make npm skip devDependencies (tsc, vite), hence --include=dev.
+    buildCommand: npx -y npm@12 ci --include=dev && npm run build
+    # Free instances have no pre-deploy command; migrations and the seed are idempotent.
+    startCommand: npm run db:migrate:prod -w server && npm run db:seed:prod -w server && npm run start -w server
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: art-gallery-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 1d
+      - key: ADMIN_EMAIL
+        value: admin@gallery.local
+      - key: ADMIN_NAME
+        value: Gallery Admin
+      # Entered in the dashboard. The last three are all the service URL,
+      # e.g. https://art-gallery.onrender.com (Render may add a suffix if the name is taken).
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: CLIENT_URL
+        sync: false
+      - key: PUBLIC_URL
+        sync: false
+      # Baked into the client at build time: changing it needs a rebuild, not a restart.
+      - key: VITE_API_URL
+        sync: false

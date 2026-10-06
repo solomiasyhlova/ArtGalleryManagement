@@ -1,4 +1,4 @@
-# Current Feature
+# Current Feature: Deploy to Render (Free Plan)
 
 <!-- H1 gets the feature name when active, e.g. "# Current Feature: Add Navbar" -->
 
@@ -6,15 +6,40 @@
 
 <!-- Not Started | In Progress | Complete -->
 
-Not Started
+Complete
 
 ## Goals
 
 <!-- Bullet points of what success looks like. Filled by `/feature load`. -->
 
+- One free Render **Web Service** serves the API and the built client from a single origin, backed by one free **Render Postgres**. Local development is unchanged
+- In production only, the server serves `client/dist` (`index: false`): `/assets/*` with `Cache-Control: public, max-age=31536000, immutable`, other files with default caching
+- SPA fallback by content negotiation: only `GET`/`HEAD` with `req.accepts(['json', 'html']) === 'html'` get `index.html` (`Cache-Control: no-cache`). Mounted **after** `/images` and **before** the API routes; JSON, `*/*`, no `Accept` and non-GET requests fall through (`next()`)
+- Unknown paths in the browser render the client's `NotFoundPage`; non-HTML requests keep the JSON 404
+- `CLIENT_DIST_DIR` in `config/paths.ts` (same `import.meta.dirname` approach as `IMAGES_DIR`)
+- Helmet CSP `img-src 'self' data: https:`; other defaults kept; the built `index.html` has no inline script
+- `server` scripts `db:migrate:prod` / `db:seed:prod` run the compiled `dist` with plain `node` (no `tsx`); start command runs migrate → seed → start
+- `render.yaml` Blueprint: `art-gallery-db` (free, `databaseName: art_gallery`) + one `type: web` Node service (free, same region, `healthCheckPath: /health`, build `npx -y npm@12 ci --include=dev && npm run build`), env vars as specified (`DATABASE_URL` from `fromDatabase.connectionString`, generated `JWT_SECRET`, `sync: false` for `ADMIN_PASSWORD` / `CLIENT_URL` / `PUBLIC_URL` / `VITE_API_URL`), no `PORT`
+- `.node-version` pinned to `24.21.0`
+- README "Deploy to Render" section (Blueprint, values to enter, free-plan limits, redeploy) replacing the generic production paragraph; one deployment note in `project-overview.md`
+- Unit tests for `spa-fallback`; `npm run build`, `npm run lint`, `npm run typecheck`, `npm test` pass
+- Local production run (built client with `VITE_API_URL=http://localhost:8000`, `NODE_ENV=production`, local `art_gallery`) passes spec checks 1–8; Render checks (9) done by the user
+
 ## Notes
 
 <!-- Additional context, constraints, or details from the spec. -->
+
+- Spec: `context/features/render-deploy-spec.md`
+- Why one service: `onrender.com` is on the Public Suffix List, so separate subdomains are cross-site (the `lax` cookie and CORP `same-site` would break)
+- Files to create: `render.yaml`, `.node-version`, `server/src/middleware/spa-fallback.ts` (+ test), `server/src/routes/client.routes.ts`
+- Files to modify: `server/src/app.ts`, `server/src/config/paths.ts`, `server/package.json`, `README.md`, `context/project-overview.md`
+- Route collision `/artworks/:id` (client vs API) is solved by `Accept` negotiation; `lib/api.ts` must send `Accept: application/json` (check it does). Moving the API under `/api` was rejected
+- `/images` stays first: a directly opened image (`Accept: text/html`) must still get the file; a missing image in the browser falls through to the client 404, an `<img>` request gets the JSON 404
+- Render env vars exist at build time → `npm ci --include=dev`. Node 24 ships npm 11 → `npx -y npm@12 ci`; fallback is plain `npm ci --include=dev` (engines warning only)
+- `VITE_API_URL` is baked in at build time (blank → blank page); `PUBLIC_URL` must be correct before the first start (seed stores absolute image URLs, fills only `NULL`s); the real service URL may carry a suffix
+- Free plan: Postgres expires after 30 days (+14 grace), service sleeps after 15 min idle (~1 min wake), 750 h/month, 5 GB bandwidth, 512 MB RAM. No pre-deploy command, so migrations + seed run in the start command
+- Verify installed Express 5 / helmet 8 / serve-static behavior and current Render docs before relying on them
+- **Database rules**: only the user creates, connects to or changes the Render database. Never point `server/.env` at its External URL or run anything against it without an explicit "production" request
 
 ## History
 

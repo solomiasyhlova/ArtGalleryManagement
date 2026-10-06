@@ -40,12 +40,65 @@ artworks only into an empty table, and links each artwork without a picture to t
 file in `server/public/images/` named after its title (`tranquil-lake.jpg` →
 "Tranquil Lake"). The API serves those files at `/images/<file>`.
 
-For a production build, run `npm run build`, then `npm run db:migrate -w server`
-and `npm run start -w server` with `NODE_ENV=production` and `CLIENT_URL` set to
-the client's origin (production cookies are `Secure`, so serve both over HTTPS). Set
-`PUBLIC_URL` to the API's public URL before seeding, so the stored image URLs point
-at it. The client build in `client/dist` is a static SPA (built with `VITE_API_URL`
-set): serve it with a fallback to `index.html`.
+### Production
+
+In production one Node process serves both the API and the built client from a
+single origin. With `NODE_ENV=production` the server also serves `client/dist`:
+hashed `/assets/*` files are cached for a year, and a browser navigation (a `GET`
+that prefers HTML) to any other path gets `index.html`. API calls send
+`Accept: application/json`, so `/artworks/:id` returns the page on a reload and
+JSON to the client.
+
+```bash
+VITE_API_URL=https://gallery.example.com npm run build   # baked into the client
+npm run db:migrate:prod -w server    # compiled migrations, no tsx needed
+npm run db:seed:prod -w server
+npm run start -w server
+```
+
+Set `NODE_ENV=production`, and set `CLIENT_URL`, `PUBLIC_URL` and `VITE_API_URL`
+to the same public origin. Production cookies are `Secure`, so serve it over HTTPS.
+Set `PUBLIC_URL` before the first seed, because the stored image URLs start with it.
+
+## Deploy to Render
+
+[`render.yaml`](render.yaml) is a Render Blueprint for the free plan. It defines one
+free Web Service (`art-gallery`) and one free Postgres database (`art-gallery-db`)
+in Frankfurt. Both parts run on one service because `onrender.com` is a public
+suffix: two `*.onrender.com` subdomains are different sites, so the `lax` auth
+cookie would never reach a separately hosted API.
+
+1. Push the repository to GitHub. In the Render dashboard, choose **New →
+   Blueprint** and select the repository.
+2. Enter the values Render asks for:
+   - `ADMIN_PASSWORD`: 8–72 characters. The admin logs in as `admin@gallery.local`.
+   - `CLIENT_URL`, `PUBLIC_URL` and `VITE_API_URL`: all three are the service URL,
+     e.g. `https://art-gallery.onrender.com`.
+3. Apply the Blueprint. The build installs with npm 12 and builds every workspace.
+   Each start applies pending migrations and runs the seed (both are idempotent),
+   then starts the server. `/health` is the health check.
+
+`JWT_SECRET` is generated, and `DATABASE_URL` comes from the database (its internal
+URL). Render provides `PORT`. [`.node-version`](.node-version) pins Node.
+
+If the name is taken, Render adds a suffix to the service URL (e.g.
+`art-gallery-abcd.onrender.com`). Check the real URL on the service page. If it
+differs, set the three URL variables to it and redeploy. If the first start already
+seeded the pictures with the wrong `PUBLIC_URL`, fix the stored `image_url` values
+in the database by hand, because the seed only fills empty ones.
+
+**Redeploying:** every push to the default branch deploys automatically. Use
+**Manual Deploy** to deploy on demand. `VITE_API_URL` is compiled into the client,
+so a change to it needs a new build, not just a restart.
+
+**Free-plan limits** (fine for a short demo):
+
+- The service sleeps after 15 minutes without traffic, and the next request takes
+  about a minute to wake it.
+- 750 instance hours per month and 512 MB RAM.
+- 5 GB of outbound bandwidth per month on the Hobby workspace.
+- The free database has 1 GB of storage and no backups. It **expires 30 days**
+  after creation and is deleted after a further 14-day grace period.
 
 ## API
 
@@ -88,3 +141,4 @@ Run from the repository root.
 | `npm run db:migration:revert -w server`| Revert the last migration                           |
 | `npm run db:migration:generate -w server -- src/db/migrations/<Name>` | Generate a migration from entity changes |
 | `npm run db:seed -w server`            | Seed the admin, the starter artworks and pictures   |
+| `npm run db:migrate:prod -w server` / `db:seed:prod` | Migrate / seed from the built `dist` (production) |

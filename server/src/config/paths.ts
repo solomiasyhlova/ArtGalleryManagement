@@ -6,3 +6,6 @@ export const IMAGES_DIR = path.resolve(import.meta.dirname, '../../public/images
 
 /** The URL path the images folder is served under. */
 export const IMAGES_ROUTE = '/images';
+
+/** The Vite build (`client/dist`), served by the API in production. Same depth trick as above. */
+export const CLIENT_DIST_DIR = path.resolve(import.meta.dirname, '../../../client/dist');

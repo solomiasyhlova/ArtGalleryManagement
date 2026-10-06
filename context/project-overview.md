@@ -193,6 +193,20 @@ No relations between `User` and `Artwork` (ownership or audit) are needed for th
 default `http://localhost:$PORT`; the base of stored image URLs)
 `client/.env`: `VITE_API_URL=http://localhost:8000`
 
+### Deployment
+
+- **Render, free plan** (`render.yaml`): one Web Service plus one Postgres. With
+  `NODE_ENV=production` the API also serves `client/dist` from the **same origin**.
+  `*.onrender.com` subdomains are cross-site, which would break the `lax` cookie.
+- **SPA fallback by `Accept`**: after `/images` and `/health`, a `GET`/`HEAD` that
+  prefers HTML gets `index.html` (`no-cache`). API calls send `Accept:
+  application/json`, so `/artworks/:id` serves the page on a reload and JSON to the
+  client.
+- Hashed `/assets/*` are `immutable`, and CSP `img-src` allows `https:` for
+  external image URLs.
+- The start command runs `db:migrate:prod` and `db:seed:prod` (compiled `dist`, no
+  `tsx`) before the server starts.
+
 ## Architecture Notes
 
 ### Repository structure
@@ -213,10 +227,10 @@ default `http://localhost:$PORT`; the base of stored image URLs)
 │  ├─ db/migrations/        # generated migrations
 │  ├─ db/seed.ts            # admin + 4 artworks + artwork images
 │  ├─ entities/             # Artwork.ts, User.ts
-│  ├─ routes/               # auth.routes.ts, artworks.routes.ts, images.routes.ts
+│  ├─ routes/               # auth, artworks, images, client (prod: client/dist + SPA fallback)
 │  ├─ controllers/          # HTTP in/out only
 │  ├─ services/             # business logic + repository access
-│  ├─ middleware/           # requireAuth, requireRole, validate, errorHandler, notFound, imageFilesOnly
+│  ├─ middleware/           # requireAuth, requireRole, validate, errorHandler, notFound, imageFilesOnly, spaFallback
 │  └─ utils/                # HttpError, jwt helpers, cookie options, escapeLike, image slugs
 ├─ server/public/images/    # artwork pictures served at /images (extension)
 └─ client/src/

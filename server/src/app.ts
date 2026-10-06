@@ -8,20 +8,30 @@ import { errorHandler } from './middleware/error-handler.js';
 import { notFound } from './middleware/not-found.js';
 import { artworksRouter } from './routes/artworks.routes.js';
 import { authRouter } from './routes/auth.routes.js';
+import { clientRouter } from './routes/client.routes.js';
 import { healthRouter } from './routes/health.routes.js';
 import { imagesRouter } from './routes/images.routes.js';
 
 export function createApp(): Express {
   const app = express();
 
-  // `same-site`, not helmet's `same-origin`: the client (another port) loads /images from here.
-  app.use(helmet({ crossOriginResourcePolicy: { policy: 'same-site' } }));
+  app.use(
+    helmet({
+      // In production this API also serves the page, and admins enter image URLs from other hosts.
+      contentSecurityPolicy: { directives: { 'img-src': ["'self'", 'data:', 'https:'] } },
+      // `same-site`, not helmet's `same-origin`: in dev the client (another port) loads /images.
+      crossOriginResourcePolicy: { policy: 'same-site' },
+    }),
+  );
   app.use(cors({ origin: env.CLIENT_URL, credentials: true }));
+  // Images first: a picture opened directly in the browser asks for HTML but must get the file.
   app.use(IMAGES_ROUTE, imagesRouter);
   app.use(express.json());
   app.use(cookieParser());
 
   app.use(healthRouter);
+  // Before the API, so a reload of a client route (`/artworks/:id`) gets the page, not JSON.
+  if (env.NODE_ENV === 'production') app.use(clientRouter);
   app.use('/auth', authRouter);
   app.use('/artworks', artworksRouter);
 

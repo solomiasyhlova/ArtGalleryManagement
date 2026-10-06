@@ -15,7 +15,9 @@
     "db:migrate": "tsx --env-file-if-exists=.env ../node_modules/typeorm/cli.js migration:run -d src/db/data-source.ts",
     "db:migration:show": "tsx --env-file-if-exists=.env ../node_modules/typeorm/cli.js migration:show -d src/db/data-source.ts",
     "db:migration:revert": "tsx --env-file-if-exists=.env ../node_modules/typeorm/cli.js migration:revert -d src/db/data-source.ts",
-    "db:seed": "tsx --env-file-if-exists=.env src/db/seed.ts"
+    "db:seed": "tsx --env-file-if-exists=.env src/db/seed.ts",
+    "db:migrate:prod": "node --env-file-if-exists=.env ../node_modules/typeorm/cli.js migration:run -d dist/db/data-source.js",
+    "db:seed:prod": "node --env-file-if-exists=.env dist/db/seed.js"
   },
   "dependencies": {
     "@art-gallery/shared": "*",
