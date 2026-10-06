@@ -1,4 +1,4 @@
-# Current Feature
+# Current Feature: Fix - Remove uuid-ossp, patch shell-quote
 
 <!-- H1 gets the feature name when active, e.g. "# Current Feature: Add Navbar" -->
 
@@ -6,15 +6,27 @@
 
 <!-- Not Started | In Progress | Complete -->
 
-Not Started
+In Progress
 
 ## Goals
 
 <!-- Bullet points of what success looks like. Filled by `/feature load`. -->
 
+- The `uuid-ossp` extension is gone from the local `art_gallery` DB (one-off `DROP EXTENSION IF EXISTS "uuid-ossp"`, no migration)
+- `users.id` still defaults to `gen_random_uuid()` and the app still connects, seeds and logs in
+- `shell-quote` resolves to a patched version (`>= 1.11.0`) via a root npm `overrides` entry scoped to `concurrently`
+- `npm audit` no longer reports `shell-quote` / `concurrently`
+- `npm run dev` still starts shared, server and client through `concurrently`
+- `npm test`, `npm run typecheck`, `npm run lint`, `npm run build` pass
+
 ## Notes
 
 <!-- Additional context, constraints, or details from the spec. -->
+
+- `uuid-ossp` was installed by TypeORM's `afterConnect` (default `installExtensions`) during the first `migration:generate` in auth-phase-1, never by a migration. Nothing depends on it (0 `pg_depend` rows; `users.id` uses the built-in `gen_random_uuid()`). User chose a one-off DROP over a new migration, because no migration ever created it and it exists only on this machine
+- `concurrently@10.0.5` (latest) pins `shell-quote` to exactly `1.9.0`, which is affected by GHSA-pqg4-j6r4-53mv (`>=1.8.4 <1.11.0`). npm audit's suggested fix downgrades `concurrently` to 9.2.1 (semver major), so don't use it
+- `concurrently` only imports `quote` (in `expand-arguments.js`). The 1.9.0 → 1.12.0 diff keeps the same API: stricter quoting, more operators, and the advisory fix (throws on a line terminator after a comment token)
+- Remove the override once `concurrently` ships with a patched `shell-quote`
 
 ## History
 
