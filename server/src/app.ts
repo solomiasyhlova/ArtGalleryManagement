@@ -5,6 +5,7 @@ import helmet from 'helmet';
 import { env } from './config/env.js';
 import { errorHandler } from './middleware/error-handler.js';
 import { notFound } from './middleware/not-found.js';
+import { artworksRouter } from './routes/artworks.routes.js';
 import { authRouter } from './routes/auth.routes.js';
 import { healthRouter } from './routes/health.routes.js';
 
@@ -18,6 +19,7 @@ export function createApp(): Express {
 
   app.use(healthRouter);
   app.use('/auth', authRouter);
+  app.use('/artworks', artworksRouter);
 
   app.use(notFound);
   app.use(errorHandler);

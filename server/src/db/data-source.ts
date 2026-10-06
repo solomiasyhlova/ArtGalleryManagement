@@ -1,5 +1,6 @@
 import { DataSource } from 'typeorm';
 import { env } from '../config/env.js';
+import { Artwork } from '../entities/Artwork.js';
 import { User } from '../entities/User.js';
 
 // Globs need forward slashes; `import.meta.dirname` uses backslashes on Windows.
@@ -17,6 +18,6 @@ export const AppDataSource = new DataSource({
   installExtensions: false,
   migrationsRun: false,
   logging: env.NODE_ENV === 'development',
-  entities: [User],
+  entities: [User, Artwork],
   migrations: [`${migrationsDir}/*.{ts,js}`],
 });

@@ -102,6 +102,27 @@ describe('errorHandler', () => {
     expect(console.error).toHaveBeenCalledWith(streamError);
   });
 
+  it('maps an undecodable path param to 404 NOT_FOUND', () => {
+    const res = createRes();
+    const decodeError = Object.assign(new URIError("Failed to decode param '%ZZ'"), {
+      status: 400,
+    });
+
+    errorHandler(decodeError, req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(404);
+    expect(res.json).toHaveBeenCalledWith({ error: { code: 'NOT_FOUND', message: 'Not found' } });
+    expect(console.error).not.toHaveBeenCalled();
+  });
+
+  it('treats other URIErrors as 500', () => {
+    const res = createRes();
+
+    errorHandler(new URIError('URI malformed'), req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(500);
+  });
+
   it('turns unknown errors into a 500 without leaking the message or stack', () => {
     const res = createRes();
     const err = new Error('connection refused at db.internal:5432');

@@ -21,6 +21,11 @@ function isBodyParserClientError(err: unknown): err is BodyParserClientError {
   );
 }
 
+/** The router's error for a path param it can't percent-decode, e.g. `/artworks/%ZZ`. */
+function isParamDecodeError(err: unknown): boolean {
+  return err instanceof URIError && (err as { status?: unknown }).status === 400;
+}
+
 function toBody(err: HttpError): ApiErrorBody {
   return {
     error: {
@@ -49,6 +54,12 @@ export const errorHandler: ErrorRequestHandler = (err, _req, res, next) => {
     res
       .status(err.status)
       .json(toBody(new HttpError(err.status, ERROR_CODES.VALIDATION_ERROR, message)));
+    return;
+  }
+
+  // An id that isn't valid in a URL can't name a resource, like any other malformed id.
+  if (isParamDecodeError(err)) {
+    res.status(404).json(toBody(new HttpError(404, ERROR_CODES.NOT_FOUND, 'Not found')));
     return;
   }
 

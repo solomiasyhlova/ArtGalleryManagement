@@ -1,4 +1,4 @@
-# Current Feature
+# Current Feature: Artworks API - Model, Seed & Read Endpoints
 
 <!-- H1 gets the feature name when active, e.g. "# Current Feature: Add Navbar" -->
 
@@ -6,15 +6,34 @@
 
 <!-- Not Started | In Progress | Complete -->
 
-Not Started
+In Progress
 
 ## Goals
 
 <!-- Bullet points of what success looks like. Filled by `/feature load`. -->
 
+- `Artwork` entity (`server/src/entities/Artwork.ts`) → table `artworks`: UUID PK, `title varchar(99)`, `artist varchar(50)` (indexed), `type` `artwork_type` enum (indexed, `enumName: 'artwork_type'`, values from `ARTWORK_TYPES`), `price numeric(12,2)` with `numericTransformer` and `CHECK (price > 0)`, `availability boolean DEFAULT true`, nullable `imageUrl varchar(2048)`, `createdAt` / `updatedAt` `timestamptz`
+- `Artwork` registered in `data-source.ts`; `CreateArtworks` migration generated, reviewed and run against `art_gallery`
+- Shared `shared/src/schemas/artwork.ts`: `artworkQuerySchema` (`price` asc|desc, `artist` ≤ 50, `type` enum, `page` int ≥ 1 default 1, `limit` int 1–50 default 12, coerced from strings), `Artwork` type and `Paginated<T>`; exported from `shared/src/index.ts`
+- `server/src/utils/escape-like.ts`: escapes `\`, `%`, `_` for `ILIKE`
+- `artworks.service`: list with `artist ILIKE '%…%'` (parameterized, escaped), exact `type`, `price` sort then `createdAt DESC, id` (or just `createdAt DESC, id`), `skip`/`take` + `getManyAndCount()`, response `{ data, meta: { page, limit, total, totalPages } }`; page past the end → empty `data` with correct `meta`. Get by id → 404 `NOT_FOUND`, malformed UUID → 404 without touching the DB
+- `artworks.controller` + `artworks.routes`: `GET /artworks` (`requireAuth`, `validate({ query })`) and `GET /artworks/:id` (`requireAuth`), mounted at `/artworks` in `app.ts`
+- `server/src/db/seeds/artworks.seed.ts`: `seedArtworks()` inserts the 4 overview artworks only when the table is empty; runs after `seedAdmin` in `seed.ts`
+- Unit tests: query schema (coercion, invalid sort/type/limit), `escapeLike`, service (filters, ordering, pagination math, 404)
+- Verification: `\d artworks` shows the table, check constraint and indexes; seeding twice → exactly 4 artworks; the curl checks from the spec (list, filter+sort, page 2 of limit 3, 400s for `price=cheap` / `type=pottery` / `limit=500`, `artist=%25` → 0 results, by-id 200/404/404, no cookie → 401); `npm test`, `npm run typecheck`, `npm run lint`, `npm run build` pass
+
 ## Notes
 
 <!-- Additional context, constraints, or details from the spec. -->
+
+- Spec: `context/features/artworks-phase-1-spec.md`. The artwork input schema (POST/PUT) is phase 2, not here
+- `pg` returns `numeric` as a string; with `numericTransformer` the API must return `price` as a number
+- Query params are strings: `z.coerce.number().int()` for `page` / `limit`. Parsed values come from `res.locals.validated` (Express 5 `req.query` is read-only)
+- QueryBuilder parameters only (`:artist`), never interpolation. Postgres `ILIKE` uses `\` as its default escape character
+- Never pass a non-UUID to `findOneBy({ id })` (`22P02` → 500). Check the format first and throw 404
+- The `id` tie-breaker keeps ordering stable across pages
+- Conventions from earlier phases: snake_case column names (`image_url`, `created_at`, `updated_at`), explicit column `type`s (tsx/esbuild emit no decorator metadata), switch the generated migration to `import type { MigrationInterface, QueryRunner }` and run Prettier on it **before** `db:migrate`. Verify TypeORM 1.1.1 APIs (enum columns, `@Check`, `@Index`, QueryBuilder) against the installed version
+- DB operations run only against the local `art_gallery` database
 
 ## History
 
