@@ -1,4 +1,4 @@
-# Current Feature
+# Current Feature: Gallery - Add, Edit & Delete Artworks (admin)
 
 <!-- H1 gets the feature name when active, e.g. "# Current Feature: Add Navbar" -->
 
@@ -6,15 +6,58 @@
 
 <!-- Not Started | In Progress | Complete -->
 
-Not Started
+Complete
 
 ## Goals
 
 <!-- Bullet points of what success looks like. Filled by `/feature load`. -->
 
+- `ArtworkFormDialog` (shadcn `Dialog`, "Add New Artwork" / "Edit Artwork") wrapping a fields-only `ArtworkForm`: Title, Artist, Type (`Select`), Price (`$` prefix, step 0.01), Availability (`Switch`, helper "For sale" / "Exhibition only"), Image URL (optional, live thumbnail once valid)
+- React Hook Form + `zodResolver(artworkInputSchema)`, validates on blur and submit, errors under each field; edit mode pre-filled; the form resets every time the dialog opens
+- Pending: submit disabled with a spinner; dialog closes on success; 400 `details` → per-field `setError`, other errors → toast
+- `DeleteArtworkDialog` (shadcn `AlertDialog`): `Delete "{title}"? This cannot be undone.`, destructive confirm with a pending state
+- `useArtworkMutations`: `createArtwork` / `updateArtwork` / `deleteArtwork`; on success invalidate `['artworks']` (+ `['artwork', id]`) and toast "Artwork added" / "Artwork updated" / "Artwork deleted"; 403 → "You don't have permission"; 404 on edit/delete → "This artwork no longer exists" + invalidate the list
+- Admin only (`isAdmin`): "Add New Artwork" primary button in the toolbar's `actions` slot; kebab menu (Edit / Delete) at the top right of each card's image, rendered as a sibling of the card `Link`
+- Users see neither the button nor the menus (UI only; the API enforces 403)
+- `lib/apply-server-errors.ts` + test (400 `details` → `setError`)
+- `npm test`, `npm run typecheck`, `npm run lint` and `npm run build` pass; spec checks 1–10 verified in a real browser, keyboard-only flow included
+
 ## Notes
 
 <!-- Additional context, constraints, or details from the spec. -->
+
+- Spec: `context/features/gallery-phase-3-spec.md`
+- Create: `components/artworks/ArtworkForm.tsx`, `ArtworkFormDialog.tsx`, `DeleteArtworkDialog.tsx`, `ArtworkCardMenu.tsx`, `hooks/useArtworkMutations.ts`, `lib/apply-server-errors.ts` + test
+- Modify: `components/artworks/ArtworkToolbar.tsx` (Add button via the existing `actions` slot), `ArtworkCard.tsx` (menu), `pages/GalleryPage.tsx` (dialog state)
+- **Overlap with existing code**: `lib/form-errors.ts` already has `applyApiError(error, setError, fields)` (400/409 `details` → fields, else form-level `root`; 5xx hidden) + tests, used by Login/Register. Reuse or extend it rather than duplicating it in a new `apply-server-errors.ts`; decide at `start`. The spec wants non-field errors as a **toast**, not a `root` error
+- shadcn `dialog`, `alert-dialog` and `switch` are **not installed** (`components/ui` has avatar/badge/button/card/dropdown-menu/field/input/label/pagination/select/separator/skeleton/sonner/spinner). Add with `-c client` (the CLI refuses the monorepo root), answer **no** to overwrite prompts, Prettier-format. Verify shadcn 4 `radix-nova` conventions via Context7 first
+- Forms use the `field` components (`Controller` + `Field` / `FieldLabel` / `FieldError`) plus `FormTextField` / `SubmitButton` / `FormRootError`, as in the auth pages
+- Price with `valueAsNumber`: an empty field is `NaN`, but the shared schema says "Price is required" only for `undefined` (`NaN` → "Price must be a number"). Map `NaN` → `undefined` in the form (e.g. `setValueAs`) or adjust the shared message; don't fork the rule client-side
+- Form type: `useForm<z.input<typeof artworkInputSchema>, unknown, z.output<typeof artworkInputSchema>>` (`availability` has a `.default(true)`, `imageUrl` transforms `''` → `null`). Edit defaults must map `imageUrl: null` → `''`
+- Image preview: reuse `ArtworkImage` (stores the failed URL, placeholder on error); show it only when the field passes the schema
+- Card menu must be a sibling of the card `<Link>` (no interactive content inside `<a>`). Open dialogs from `DropdownMenuItem` `onSelect`, with dialog state outside the menu, to avoid a stuck `pointer-events: none` on `body`
+- Deleting the last card of the last page → the existing past-the-end redirect (`meta.page > meta.totalPages > 0`) should move to the previous page; not yet seen in a browser
+- Mutations go through `lib/api.ts`; global 401 handling already runs from `MutationCache.onError`
+- Browser checks use the real API (no stubbed responses). Artworks created during testing are deleted via the API only after asking
+
+### Implementation notes
+
+- shadcn `dialog`, `alert-dialog`, `switch` added with `-c client` (overwrite `button.tsx`? → **no**; the diff was formatting-only), Prettier-formatted
+- **Deviation: no `lib/apply-server-errors.ts`.** `lib/form-errors.ts` gained `hasFieldDetails()` and `applyFieldErrors()` (sets known fields, returns whether it did); `applyApiError()` now builds on it (unchanged behaviour for Login/Register). Tests added to `form-errors.test.ts`
+- **Shared schema messages**: `price` reports `NaN` (an empty number input) as "Price is required"; `type` reports a missing value as "Type is required" (an invalid one keeps "Type must be one of: …"). New `ArtworkFormInput` (`z.input`) type in `shared`, since the client has no direct `zod` dependency
+- Price is a `Controller` (consistent with the `field` components) rather than `register`: `onChange` passes `valueAsNumber`, the input shows `''` for `NaN` / `undefined`. Using `undefined` instead of `NaN` would make RHF's `Controller` fall back to the default value (an edited price would snap back when cleared)
+- `FormTextField` takes `Control<T, unknown, TParsed>` so forms whose parsed output differs from their input (defaults, transforms) can use it
+- `useArtworkMutations`: success → `invalidateQueries(['artworks'])` is **awaited** before the toast, so the dialog closes on a list that already shows the change; update also `setQueryData(['artwork', id])`, delete `removeQueries(['artwork', id])`. Errors: pure `mutationErrorMessage()` (+ test): 401 → none (global handler), 403 → "You don't have permission", 404 → "This artwork no longer exists" (+ list invalidated, detail removed), 400 with field details → none (the form shows them), else `getErrorMessage`. The form toasts only when a 400's details match no field. Exported `refreshAfterError()` is tested with a real `QueryClient` and mocked `sonner`: a 404 removes `['artwork', id]` and invalidates every `['artworks', …]` page, a 403 / 500 only toasts, a 401 stays silent
+- Dialogs can't be closed while their request is pending (Cancel disabled, Esc / overlay / ✕ ignored), so the result always lands in an open dialog. 404 on edit / delete closes the dialog
+- Form reset: the form body mounts with `DialogContent` (Radix unmounts it when closed) **and** `GalleryPage` bumps the dialog's `key` on every opening (reopening during the exit animation would otherwise keep the old form). The artwork stays in state while closing so the title doesn't flip mid-animation
+- **Radix returns focus only to a `Dialog.Trigger`**, and these dialogs are opened from state, so focus fell to `<body>`. `hooks/useReturnFocus` remembers the focused element in `onOpenAutoFocus` and restores it in `onCloseAutoFocus`; if it's gone (the deleted card's menu), focus goes to the page `h1` (`tabIndex={-1}`)
+- `ArtworkCardMenu`: the chosen item is stored in a ref and run from `DropdownMenuContent`'s `onCloseAutoFocus`, i.e. after the menu has closed and focused its trigger. The dialog then opens over no other modal layer (no stuck `pointer-events: none`) and captures the trigger as its return target
+- `ArtworkCard` is now a `relative` wrapper with the `Link` and an absolutely positioned `actions` slot as siblings; the hover lift moved to the wrapper (`group-hover:shadow-lg` on the link) so the card stays raised while the menu button is hovered. `ArtworkGrid` takes `cardActions?: (artwork) => ReactNode`
+- Add button goes through the toolbar's existing `actions` slot (full width under `sm`); `ArtworkToolbar.tsx` itself needed no change
+- Image preview: the URL field is watched with `useWatch`, debounced 300 ms, parsed with `artworkInputSchema.shape.imageUrl`; a 128px 4:3 thumbnail (keyed by URL) or "Couldn't load an image from this URL"
+- Delete confirm button: solid `bg-destructive` + `text-primary-foreground` (4.6:1); shadcn's `destructive` variant is a 10% tint with red text, just under AA
+- Verified in real Chrome (Playwright in the scratchpad, real API + `art_gallery`, no stubs): spec checks 1–9 (57 assertions) incl. user without controls + API 403, empty submit (4 errors, focus to Title), 100-char title, price 0 / -5 / cleared, preview only for a valid URL, create/edit/delete toasts and cards without reload, pre-filled edit, empty Add after Edit, reload persistence, keyboard-only menu → edit → Enter submit → menu → delete (Cancel focused, Tab to Delete), Esc closes both dialogs, focus back to the kebab / Add button / `h1` after delete, `body` pointer-events restored, edit of an artwork deleted meanwhile → 404 toast + card gone, 375px. Also seen for the first time: deleting the only card on the last page (`?price=desc&page=2`) redirects to `?price=desc` with 12 cards
+- Bundle now 714 kB (Radix Dialog / AlertDialog / Switch)
 
 ## History
 

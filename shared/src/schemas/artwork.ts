@@ -37,11 +37,16 @@ export const artworkInputSchema = z.object({
     .trim()
     .min(1, 'Artist is required')
     .max(ARTIST_MAX_LENGTH, `Artist must be at most ${ARTIST_MAX_LENGTH} characters`),
-  type: z.enum(ARTWORK_TYPES, { error: TYPE_ERROR }),
+  type: z.enum(ARTWORK_TYPES, {
+    error: (issue) => (issue.input === undefined ? 'Type is required' : TYPE_ERROR),
+  }),
+  // An empty number input reads as `NaN` in the form (`valueAsNumber`), so it counts as missing.
   price: z
     .number({
       error: (issue) =>
-        issue.input === undefined ? 'Price is required' : 'Price must be a number',
+        issue.input === undefined || Number.isNaN(issue.input)
+          ? 'Price is required'
+          : 'Price must be a number',
     })
     .positive('Price must be greater than 0')
     .multipleOf(0.01, 'Price can have at most 2 decimal places')
@@ -56,6 +61,9 @@ export const artworkInputSchema = z.object({
 });
 
 export type ArtworkInput = z.infer<typeof artworkInputSchema>;
+
+/** What the artwork form holds before parsing: `availability` may be missing, `imageUrl` may be `''`. */
+export type ArtworkFormInput = z.input<typeof artworkInputSchema>;
 
 /** Query params arrive as strings, so `page` and `limit` are coerced to numbers. */
 export const artworkQuerySchema = z.object({

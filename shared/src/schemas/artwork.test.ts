@@ -128,7 +128,7 @@ describe('artworkInputSchema', () => {
     expect(fieldIssues(artworkInputSchema, {})).toEqual({
       title: ['Title is required'],
       artist: ['Artist is required'],
-      type: [`Type must be one of: ${ARTWORK_TYPES.join(', ')}`],
+      type: ['Type is required'],
       price: ['Price is required'],
     });
   });
@@ -199,12 +199,16 @@ describe('artworkInputSchema', () => {
     expect(inputIssues({ price })).toEqual({ price: [message] });
   });
 
-  it.each(['4500', '', null, true, Number.NaN, Number.POSITIVE_INFINITY])(
+  it.each(['4500', '', null, true, Number.POSITIVE_INFINITY])(
     'rejects the non-number price %j without coercing it',
     (price) => {
       expect(inputIssues({ price })).toEqual({ price: ['Price must be a number'] });
     },
   );
+
+  it('reports NaN (an empty number input) as a missing price', () => {
+    expect(inputIssues({ price: Number.NaN })).toEqual({ price: ['Price is required'] });
+  });
 
   it.each(['true', 1, null])('rejects availability=%j', (availability) => {
     expect(inputIssues({ availability })).toEqual({

@@ -3,22 +3,22 @@ import { Controller, type Control, type FieldValues, type Path } from 'react-hoo
 import { Field, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 
-interface FormTextFieldProps<T extends FieldValues> extends Omit<
+interface FormTextFieldProps<T extends FieldValues, TParsed> extends Omit<
   ComponentProps<typeof Input>,
   'name' | 'id' | 'value' | 'defaultValue'
 > {
-  control: Control<T>;
+  control: Control<T, unknown, TParsed>;
   name: Path<T>;
   label: string;
 }
 
 /** A labelled input bound to React Hook Form, with its error underneath (shadcn `Field`). */
-export function FormTextField<T extends FieldValues>({
+export function FormTextField<T extends FieldValues, TParsed = T>({
   control,
   name,
   label,
   ...inputProps
-}: FormTextFieldProps<T>) {
+}: FormTextFieldProps<T, TParsed>) {
   return (
     <Controller
       control={control}

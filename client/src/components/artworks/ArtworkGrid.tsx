@@ -20,6 +20,8 @@ interface ArtworkGridProps {
   error: Error | null;
   onRetry: () => void;
   isRetrying: boolean;
+  /** Per-card controls, e.g. the admin menu. */
+  cardActions?: (artwork: Artwork) => ReactNode;
 }
 
 /** Shows the artworks, or the loading, empty or error state. Data already loaded wins over a later error. */
@@ -31,6 +33,7 @@ export function ArtworkGrid({
   error,
   onRetry,
   isRetrying,
+  cardActions,
 }: ArtworkGridProps) {
   if (artworks) {
     return (
@@ -44,7 +47,7 @@ export function ArtworkGrid({
           <GridList>
             {artworks.map((artwork) => (
               <li key={artwork.id}>
-                <ArtworkCard artwork={artwork} />
+                <ArtworkCard artwork={artwork} actions={cardActions?.(artwork)} />
               </li>
             ))}
           </GridList>
