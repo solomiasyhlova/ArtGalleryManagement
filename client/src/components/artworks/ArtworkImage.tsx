@@ -7,11 +7,13 @@ interface ArtworkImageProps {
   src: string | null;
   alt: string;
   type: ArtworkType;
+  /** `eager` for a picture that is on screen right away (the detail page). */
+  loading?: 'lazy' | 'eager';
   className?: string;
 }
 
 /** A 4:3 picture. With no `src`, or once it fails to load, a placeholder shows the type icon. */
-export function ArtworkImage({ src, alt, type, className }: ArtworkImageProps) {
+export function ArtworkImage({ src, alt, type, loading = 'lazy', className }: ArtworkImageProps) {
   // The URL that failed, not a boolean, so a new `src` (after an edit) gets its own attempt.
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
   const showImage = src !== null && src !== failedSrc;
@@ -23,7 +25,7 @@ export function ArtworkImage({ src, alt, type, className }: ArtworkImageProps) {
         <img
           src={src}
           alt={alt}
-          loading="lazy"
+          loading={loading}
           decoding="async"
           onError={() => setFailedSrc(src)}
           className="size-full object-cover"

@@ -15,9 +15,15 @@ export function useGalleryParams() {
   const [searchParams, setSearchParams] = useSearchParams();
   const params = useMemo(() => parseGalleryParams(searchParams), [searchParams]);
 
-  /** Changes filters or the sort and goes back to page 1. Pushes a history entry by default. */
+  /**
+   * Changes filters or the sort and goes back to page 1. Pushes a history entry by default.
+   * The page keeps its scroll position (`<ScrollRestoration>` would jump to the top).
+   */
   function setFilters(changes: GalleryFilters, options?: NavigateOptions) {
-    setSearchParams(serializeGalleryParams({ ...params, ...changes, page: 1 }), options);
+    setSearchParams(serializeGalleryParams({ ...params, ...changes, page: 1 }), {
+      preventScrollReset: true,
+      ...options,
+    });
   }
 
   /**
@@ -31,7 +37,7 @@ export function useGalleryParams() {
   }
 
   function clearFilters() {
-    setSearchParams(new URLSearchParams());
+    setSearchParams(new URLSearchParams(), { preventScrollReset: true });
   }
 
   /** The query string (with `?`) of `page` under the current filters, for links. */

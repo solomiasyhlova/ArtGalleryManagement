@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 import { ARTWORK_TYPE_STYLES } from '@/lib/artwork-types';
 import { formatPrice } from '@/lib/format';
+import { FROM_GALLERY_STATE } from '@/lib/location-state';
 import { cn } from '@/lib/utils';
 import { ArtworkImage } from './ArtworkImage';
 import { AvailabilityBadge } from './AvailabilityBadge';
@@ -22,6 +23,7 @@ export function ArtworkCard({ artwork, actions }: ArtworkCardProps) {
     <div className="group relative h-full transition-[translate] motion-safe:hover:-translate-y-0.5">
       <Link
         to={`/artworks/${id}`}
+        state={FROM_GALLERY_STATE}
         className={cn(
           'block h-full overflow-hidden rounded-lg border-2 bg-card text-card-foreground shadow-sm transition-shadow outline-none group-hover:shadow-lg focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
           ARTWORK_TYPE_STYLES[type].borderClass,

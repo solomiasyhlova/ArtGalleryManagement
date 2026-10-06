@@ -20,7 +20,10 @@ interface GalleryPaginationProps {
   onNavigate: () => void;
 }
 
-/** Previous / page numbers / Next as links, so every page has a shareable URL. Hidden for one page. */
+/**
+ * Previous / page numbers / Next as links, so every page has a shareable URL. Hidden for one page.
+ * The links don't reset the scroll: `onNavigate` scrolls to the grid instead.
+ */
 export function GalleryPagination({
   page,
   totalPages,
@@ -45,7 +48,7 @@ export function GalleryPagination({
           tabIndex: -1,
           className: 'pointer-events-none opacity-50',
         }
-      : { to: { search: pageSearch(target) }, onClick: handleClick };
+      : { to: { search: pageSearch(target) }, onClick: handleClick, preventScrollReset: true };
   }
 
   return (
@@ -62,6 +65,7 @@ export function GalleryPagination({
                 isActive={item === page}
                 aria-label={`Page ${item}`}
                 onClick={handleClick}
+                preventScrollReset
                 className={cn(item === page && 'pointer-events-none')}
               >
                 {item}

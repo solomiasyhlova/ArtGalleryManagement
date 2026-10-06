@@ -1,7 +1,14 @@
+import type { Artwork, Paginated } from '@art-gallery/shared';
 import { QueryClient } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@/lib/api';
-import { isNotFound, mutationErrorMessage, refreshAfterError } from './useArtworkMutations';
+import {
+  isNotFound,
+  mutationErrorMessage,
+  refreshAfterError,
+  removeFromLists,
+  replaceInLists,
+} from './useArtworkMutations';
 
 const toast = vi.hoisted(() => ({ error: vi.fn(), success: vi.fn() }));
 vi.mock('sonner', () => ({ toast }));
@@ -55,6 +62,73 @@ describe('refreshAfterError', () => {
     refreshAfterError(cachedClient(), ID, new ApiError(401, 'UNAUTHENTICATED', 'Not signed in'));
 
     expect(toast.error).not.toHaveBeenCalled();
+  });
+});
+
+describe('list patching', () => {
+  const artwork = (id: string, title: string) =>
+    ({
+      id,
+      title,
+      artist: 'Maria Gonzalez',
+      type: 'painting',
+      price: 3500,
+      availability: true,
+      imageUrl: null,
+      createdAt: '2026-03-05T12:00:00.000Z',
+      updatedAt: '2026-03-05T12:00:00.000Z',
+    }) satisfies Artwork;
+  const OTHER_ID = '0b9d6c1e-2f3a-4b5c-8d7e-6f5a4b3c2d1e';
+  const meta = { page: 1, limit: 12, total: 2, totalPages: 1 };
+
+  function listsClient() {
+    const client = new QueryClient();
+    client.setQueryData<Paginated<Artwork>>(['artworks', { page: 1 }], {
+      data: [artwork(OTHER_ID, 'Abstract Vibrance'), artwork(ID, 'Tranquil Lake')],
+      meta,
+    });
+    client.setQueryData<Paginated<Artwork>>(['artworks', { type: 'sculpture' }], {
+      data: [artwork(OTHER_ID, 'Abstract Vibrance')],
+      meta: { ...meta, total: 1 },
+    });
+    return client;
+  }
+
+  const titles = (client: QueryClient, key: unknown[]) =>
+    client.getQueryData<Paginated<Artwork>>(key)?.data.map((item) => item.title);
+
+  it('replaceInLists swaps the saved artwork in place', () => {
+    const client = listsClient();
+
+    replaceInLists(client, artwork(ID, 'Still Lake'));
+
+    expect(titles(client, ['artworks', { page: 1 }])).toEqual(['Abstract Vibrance', 'Still Lake']);
+  });
+
+  it('removeFromLists drops the artwork and keeps the meta for the refetch to correct', () => {
+    const client = listsClient();
+
+    removeFromLists(client, ID);
+
+    expect(titles(client, ['artworks', { page: 1 }])).toEqual(['Abstract Vibrance']);
+    expect(client.getQueryData<Paginated<Artwork>>(['artworks', { page: 1 }])?.meta).toEqual(meta);
+  });
+
+  it('leaves pages without the artwork and other queries alone', () => {
+    const client = listsClient();
+    client.setQueryData(['artwork', ID], artwork(ID, 'Tranquil Lake'));
+    const untouched = client.getQueryState(['artworks', { type: 'sculpture' }])?.dataUpdatedAt;
+    // A later clock, so a write to that page would show up as a new `dataUpdatedAt`.
+    const now = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 60_000);
+
+    removeFromLists(client, ID);
+    now.mockRestore();
+
+    expect(client.getQueryState(['artworks', { type: 'sculpture' }])?.dataUpdatedAt).toBe(
+      untouched,
+    );
+    expect(client.getQueryState(['artworks', { page: 1 }])?.dataUpdatedAt).not.toBe(untouched);
+    expect(client.getQueryData(['artwork', ID])).toEqual(artwork(ID, 'Tranquil Lake'));
   });
 });
 

@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { formatPrice } from './format';
+import { formatDate, formatPrice } from './format';
+
+describe('formatDate', () => {
+  it('spells out the month', () => {
+    // Midday UTC, so the date is the same in (almost) every time zone.
+    expect(formatDate('2026-03-05T12:00:00.000Z')).toBe('March 5, 2026');
+    expect(formatDate('2025-12-24T12:30:00Z')).toBe('December 24, 2025');
+  });
+});
 
 describe('formatPrice', () => {
   it('drops the cents for whole amounts', () => {

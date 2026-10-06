@@ -21,6 +21,8 @@ interface DeleteArtworkDialogProps {
   artwork: Artwork | undefined;
   /** Gets focus on close when the element that opened the dialog is gone (the deleted card's menu). */
   returnFocusFallback?: RefObject<HTMLElement | null>;
+  /** Runs once the artwork is deleted, e.g. to leave its detail page. */
+  onDeleted?: () => void;
 }
 
 export function DeleteArtworkDialog({
@@ -28,8 +30,9 @@ export function DeleteArtworkDialog({
   onOpenChange,
   artwork,
   returnFocusFallback,
+  onDeleted,
 }: DeleteArtworkDialogProps) {
-  const { deleteArtwork } = useArtworkMutations();
+  const { deleteArtwork } = useArtworkMutations({ onDeleted });
   const focusHandlers = useReturnFocus(returnFocusFallback);
   const { isPending } = deleteArtwork;
 

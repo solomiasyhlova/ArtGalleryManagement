@@ -17,20 +17,35 @@ backend parts are implemented.
 
 ## Getting Started
 
-Prerequisites: Node.js (LTS) and PostgreSQL running locally.
+Prerequisites:
+
+- Node.js `^22.22.2`, `^24.15.0` or `>=26`, with **npm 12 or newer** (`npm install -g npm@latest`)
+- PostgreSQL running locally (its `bin` folder on `PATH` for `createdb`)
 
 ```bash
 npm install
 createdb -U postgres art_gallery     # one-time: create the database
-cp server/.env.example server/.env   # set DATABASE_URL, JWT_SECRET and ADMIN_* values
+cp server/.env.example server/.env   # set DATABASE_URL, JWT_SECRET and ADMIN_PASSWORD
 cp client/.env.example client/.env
 npm run db:migrate -w server         # create the schema
-npm run db:seed -w server            # admin account + 4 starter artworks
+npm run db:seed -w server            # admin account + 4 starter artworks with pictures
 npm run dev                          # client :5173, API :8000
 ```
 
 Open http://localhost:5173 and log in with the `ADMIN_EMAIL` / `ADMIN_PASSWORD`
 from `server/.env`, or register a regular user account.
+
+The seed is idempotent: it creates the admin only if that email is free, inserts the
+artworks only into an empty table, and links each artwork without a picture to the
+file in `server/public/images/` named after its title (`tranquil-lake.jpg` →
+"Tranquil Lake"). The API serves those files at `/images/<file>`.
+
+For a production build, run `npm run build`, then `npm run db:migrate -w server`
+and `npm run start -w server` with `NODE_ENV=production` and `CLIENT_URL` set to
+the client's origin (production cookies are `Secure`, so serve both over HTTPS). Set
+`PUBLIC_URL` to the API's public URL before seeding, so the stored image URLs point
+at it. The client build in `client/dist` is a static SPA (built with `VITE_API_URL`
+set): serve it with a fallback to `index.html`.
 
 ## API
 
@@ -47,6 +62,8 @@ Base URL: `http://localhost:8000`
 | POST   | `/artworks`      | admin  |
 | PUT    | `/artworks/:id`  | admin  |
 | DELETE | `/artworks/:id`  | admin  |
+| GET    | `/images/:file`  | public |
+| GET    | `/health`        | public |
 
 Invalid input returns `400` with field-level details. See
 [context/project-overview.md](context/project-overview.md) for the full
@@ -54,10 +71,20 @@ specification: the data model, validation rules, error format and UI.
 
 ## Scripts
 
-| Command              | Description                     |
-| -------------------- | ------------------------------- |
-| `npm run dev`        | Run client and server in dev mode |
-| `npm run build`      | Build all workspaces            |
-| `npm run lint`       | Lint all workspaces             |
-| `npm test`           | Run unit tests once             |
-| `npm run test:watch` | Run tests in watch mode         |
+Run from the repository root.
+
+| Command                                | Description                                         |
+| -------------------------------------- | --------------------------------------------------- |
+| `npm run dev`                          | Run the client and the server in dev mode           |
+| `npm run build`                        | Build all workspaces                                |
+| `npm run start -w server`              | Start the built server                              |
+| `npm run typecheck`                    | Type-check all workspaces, tests included           |
+| `npm run lint`                         | Lint all workspaces                                 |
+| `npm run format` / `format:check`      | Format with Prettier / check the formatting         |
+| `npm test`                             | Run the unit tests once                             |
+| `npm run test:watch`                   | Run the unit tests in watch mode                    |
+| `npm run db:migrate -w server`         | Apply pending migrations                            |
+| `npm run db:migration:show -w server`  | List migrations and whether they have run           |
+| `npm run db:migration:revert -w server`| Revert the last migration                           |
+| `npm run db:migration:generate -w server -- src/db/migrations/<Name>` | Generate a migration from entity changes |
+| `npm run db:seed -w server`            | Seed the admin, the starter artworks and pictures   |

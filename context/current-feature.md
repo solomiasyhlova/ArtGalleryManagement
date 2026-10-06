@@ -1,4 +1,4 @@
-# Current Feature
+# Current Feature: Artwork Detail Page & Final Polish
 
 <!-- H1 gets the feature name when active, e.g. "# Current Feature: Add Navbar" -->
 
@@ -6,15 +6,61 @@
 
 <!-- Not Started | In Progress | Complete -->
 
-Not Started
+Complete
 
 ## Goals
 
 <!-- Bullet points of what success looks like. Filled by `/feature load`. -->
 
+- `/artworks/:id` route inside `ProtectedRoute` / `AppLayout`, rendering `ArtworkDetailPage`
+- `useArtwork(id)` → `GET /artworks/:id` with query key `['artwork', id]`
+- Layout: "← Back to gallery" link at the top; two columns at `lg` (large 4:3 image left, details right), stacked on mobile, no horizontal scroll at 375px
+- Details: title (`h1`), "By {artist}", large price (`formatPrice`), `TypeBadge`, `AvailabilityBadge` + "Available for purchase" / "On display for exhibition only", date added (`createdAt`, formatted)
+- Admin only: Edit (`ArtworkFormDialog` in edit mode; changes show on the page and in the gallery) and Delete (`DeleteArtworkDialog`; after success → `/` with a toast, artwork gone from the list)
+- Users see neither button (the API still enforces 403)
+- States: loading skeleton (`ArtworkDetailSkeleton`); 404 (unknown or malformed id) → "Artwork not found" with a link to the gallery; other errors → message + retry
+- `document.title` = `"{title} · ArtGalleryManager"`
+- Back link returns to the gallery with its filters (`navigate(-1)`), or links to `/` when the page was opened directly (`location.key === 'default'`)
+- README setup steps and scripts match the real ones; a fresh run-through from `npm install` to login works
+- `npm test`, `npm run typecheck`, `npm run lint` and `npm run build` pass; spec checks 1–9 verified in a real browser
+
 ## Notes
 
 <!-- Additional context, constraints, or details from the spec. -->
+
+- Spec: `context/features/artwork-detail-spec.md`
+- Create: `pages/ArtworkDetailPage.tsx`, `hooks/useArtwork.ts`, `components/artworks/ArtworkDetails.tsx`, `components/artworks/ArtworkDetailSkeleton.tsx`
+- Modify: `router.tsx` (detail route, before `*`), `hooks/useArtworkMutations.ts` (`onDeleted` callback, cache removal), `README.md`
+- **Delete + cache**: `deleteArtwork.onSuccess` already does `removeQueries(['artwork', id])`. With the detail page's `useQuery` observer still mounted, removing the query can make the observer rebuild it and refetch → 404 flash / "not found" state before the navigation lands. Decide at `start`: navigate first and remove after, or remove right before a synchronous navigation (spec's order); verify in the browser that no `GET /artworks/:id` fires after the `DELETE`
+- `DeleteArtworkDialog` / `ArtworkFormDialog` already take `open` / `onOpenChange` / `artwork` / `returnFocusFallback`; `DeleteArtworkDialog` closes itself in its own `onSuccess`, so the page needs a way to navigate after success (the spec's `onDeleted`)
+- Edit already does `setQueryData(['artwork', id], artwork)` on success, so the detail page updates without a refetch. A 404 on edit/delete already removes the detail query and toasts "This artwork no longer exists"; on the detail page the not-found state should then show (or navigate away), check which reads better
+- Gallery dialog pattern to reuse: `DialogState` (artwork kept while closing), form dialog `key` bumped per opening, `useReturnFocus` with the page `h1` (`tabIndex={-1}`) as fallback
+- 404s aren't retried (`shouldRetry` in `lib/query-client.ts`), so the not-found state is immediate. Malformed ids (`/artworks/3`) and `%ZZ` already return 404 from the API
+- `useParams()` types `id` as `string | undefined`: guard it (e.g. `enabled: !!id` or render not-found)
+- `ArtworkImage` already handles the 4:3 box, `object-cover`, placeholder on missing / failed image; for the large image skip `loading="lazy"` if it's above the fold (check its props)
+- Card `Link`s already point to `/artworks/:id` (currently land on `NotFoundPage`)
+- `document.title`: React 19 supports a `<title>` element rendered anywhere (hoisted to `<head>`); verify against the installed React and how `index.html` sets the default title, and that it resets when leaving the page
+- Date format: e.g. `Intl.DateTimeFormat('en-US', { dateStyle: 'long' })`; a pure helper in `lib/format.ts` with a test fits the existing pattern
+- README gaps spotted: prerequisites say "Node.js (LTS)" but `engines` need Node `^22.22.2 || ^24.15.0 || >=26` and **npm ≥ 12**; Scripts table lacks `npm run typecheck`, `format` / `format:check` and the `db:*` scripts; API table lacks `GET /health` and `GET /images/:file`; `PUBLIC_URL` / `server/public/images` not mentioned. Check every command against `package.json` before editing
+- Spec check 8 (fresh run-through) touches the DB: use a throwaway database only with the user's OK, or verify the steps against `art_gallery` without destructive commands
+- Browser checks use the real API (no stubbed responses). Artworks created or deleted during testing (check 5 deletes one) need the user's OK; restore a seeded artwork afterwards if one is deleted
+- Optional overview follow-ups from earlier phases: `project-overview.md` doesn't yet mention the softened card borders, inset image, AA badge text colors, `useReturnFocus` or the newer form messages; its Status section still says "Planning"
+
+### Implementation notes
+
+- Branch `feature/artwork-detail`. New: `pages/ArtworkDetailPage.tsx`, `hooks/useArtwork.ts` (`artworkQuery()` + `useArtwork()`, key `['artwork', id]`, id `encodeURIComponent`ed), `components/artworks/ArtworkDetails.tsx`, `ArtworkDetailSkeleton.tsx`, `BackToGalleryLink.tsx`, `lib/location-state.ts` + test
+- Page: `useParams` id guarded (no id → not found); the content is keyed by id. A 404 wins over cached data (deleted meanwhile, e.g. after a 404 on edit/delete, the query is removed, refetched and lands on not-found); other errors keep loaded data, else "Couldn't load the artwork" + "Try again". Details as a `dl` (Type / Availability + explanation / Added with `<time>`), `h1` `tabIndex={-1}` as the dialogs' focus fallback, Edit (outline) + Delete (solid destructive, same classes as the confirm button) for admins
+- `document.title` via a React 19 `<title>` element: react-dom 19.3 inserts it **before** `index.html`'s `<title>` (`head > title`), so it wins while mounted and the default comes back on unmount. Not-found sets "Artwork not found · ArtGalleryManager"
+- **Deviation (Back link)**: `location.key === 'default'` isn't enough: after the login redirect (`/artworks/x` → `/login?redirect` → `/artworks/x`, both `replace`) the key isn't `default` but there's no gallery entry to go back to. Gallery card links now pass `state={FROM_GALLERY_STATE}`; `BackToGalleryLink` is a real `Link` to `/` and only a plain left click with that state does `navigate(-1)` (keeps filters, page and scroll)
+- **Scroll**: there was no scroll handling, so a card opened from a scrolled gallery left the detail page scrolled. `<ScrollRestoration />` (renders nothing in data mode) in the root route: new pages start at the top, Back/Forward restore. Gallery filter/sort/clear (`setSearchParams`) and pagination links pass `preventScrollReset`, so they keep the old behaviour (pagination still scrolls to the grid itself)
+- `useArtworkMutations({ onDeleted })` (passed through `DeleteArtworkDialog`'s new `onDeleted` prop): delete success = take it out of the cached lists → await list invalidation → toast → `onDeleted(id)` → **then** `removeQueries(['artwork', id])`. The page's `onDeleted` is `navigate('/', { replace: true, flushSync: true })`, so the page (and its observer) is gone before the removal and nothing refetches the deleted artwork. `replace` keeps Back from landing on the deleted page
+- **Cached lists**: from the detail page the gallery's lists are inactive, so invalidation only marks them stale and Back/the delete redirect would briefly show the old card. Exported `replaceInLists` (update) / `removeFromLists` (delete) patch every cached page holding the artwork via `setQueriesData` (updater returns `undefined` for pages without it, so they aren't touched) **before** the invalidation (a write marks a query fresh). Order and totals wait for the refetch. Tests added
+- `ArtworkImage` takes `loading` (`eager` on the detail page)
+- `formatDate()` (`en-US`, `dateStyle: 'long'`) + test
+- README: Node `^22.22.2 || ^24.15.0 || >=26` + npm ≥ 12, `createdb` on `PATH`, only `ADMIN_PASSWORD` must be set (email/name have defaults), seed/picture behaviour, production notes (`CLIENT_URL`, `Secure` cookie → HTTPS, `PUBLIC_URL` before seeding, SPA fallback), `/images/:file` and `/health` in the API table, every script incl. `typecheck`, `format`, `start` and the `db:*` scripts
+- Verified in real Chrome (Playwright from the earlier scratchpad, real API + `art_gallery`, no stubs), 32 checks: card from `?type=painting` scrolled gallery → detail at top with all fields, title, eager image, admin buttons; Back → same filter and scroll; filter change keeps scroll; direct open in a new tab + Back → `/`; signed out → login → detail → Back → `/`; `/artworks/0000…` and `/artworks/3` → not found + title + link; edit on detail → page, title and (after Back) gallery card updated at once, focus back on Edit; delete on detail → `/` + toast, card gone, **no request for the deleted id after the `DELETE`**, no stuck pointer-events/scroll lock, Back doesn't return to it; registered user sees no Edit/Delete; 375px stacked without overflow; 2 columns at 1280. `/artworks/%ZZ` can't be opened in dev (Vite answers 400 before the app loads; the API's 404 for it was checked in artworks-phase-1). The test artwork was deleted by check 5 itself
+- Spec check 8 (fresh README run-through), with the user's OK to reset the local `art_gallery` (they didn't need the edited data): `.env.example` has all 10 env-schema keys (existing `.env` files kept); `dropdb --force` + the README's `createdb -U postgres art_gallery` → 0 tables; `npm install`; `db:migrate` ran both migrations (`CreateUsers`, `CreateArtworks`), `db:migration:show` → both `[X]`; `db:seed` created the admin, 4 artworks and linked all 4 pictures, a second run skipped all 3 steps. In Chrome (the already running `npm run dev`; the API's pool reconnected by itself): guest → `/login`, `.env` admin logs in, 4 seeded cards newest first with the seed values and loaded pictures, detail page of "Bronze Reverie". The reset also removed the old test users (incl. `detail-check-…`) and restored "Bronze Reverie" to the seed's Sculpture / $8,200. Gotcha: the Bash tool's environment gets "connection refused" on `localhost:5432`; run `psql` / `dropdb` / `createdb` from PowerShell
+- Loading and error states in Chrome (real API, no stubs; a script polling `/health` while the user stopped and started the Postgres service): with 1.5 s of CDP latency the detail page shows the two-column skeleton under `aria-busy` + "Loading artwork…" status, then the artwork. With Postgres stopped, an uncached artwork → 500 (`requireAuth` can't load the user) → one retry → "Couldn't load the artwork" / "Something went wrong. Please try again." / enabled "Try again", still signed in (a 500 isn't a 401). Postgres started again → "Try again" loads "Geometric Harmony", alert gone. The API's pool reconnected by itself both times
 
 ## History
 
