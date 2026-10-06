@@ -13,9 +13,10 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc",
-    "dev": "tsc -w --preserveWatchOutput",
-    "clean": "tsc --build --clean",
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsc -p tsconfig.build.json -w --preserveWatchOutput",
+    "clean": "tsc --build --clean tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run"
   }
 }

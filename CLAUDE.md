@@ -25,6 +25,7 @@ Run from the repo root (npm workspaces: `client`, `server`, `shared`).
 - **Build**: `npm run build`
 - **Production server**: `npm run start -w server`
 - **Lint**: `npm run lint`
+- **Typecheck (including tests)**: `npm run typecheck`
 - **Test (once)**: `npm test`
 - **Test (watch)**: `npm run test:watch`
 - **Generate migration**: `npm run db:migration:generate -w server -- src/db/migrations/<Name>`

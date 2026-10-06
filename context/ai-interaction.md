@@ -79,7 +79,8 @@ Commands (from the repo root):
 - `npm run test:watch` runs watch mode while developing.
 - `npm test -w server` (or `-w shared`, `-w client`) runs one workspace.
 
-Run `npm test` before committing alongside `npm run build`.
+Run `npm test` before committing alongside `npm run build` and `npm run typecheck`
+(the build excludes `*.test.ts`, and Vitest does not type-check).
 
 ## Code Review
 
