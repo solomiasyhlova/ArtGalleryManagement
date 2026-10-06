@@ -1,7 +1,10 @@
 import type { NextFunction, Request, Response } from 'express';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HttpError } from '../utils/http-error.js';
+import { logError } from '../utils/log-error.js';
 import { errorHandler } from './error-handler.js';
+
+vi.mock('../utils/log-error.js', () => ({ logError: vi.fn() }));
 
 function createRes(headersSent = false) {
   const res = {
@@ -12,18 +15,18 @@ function createRes(headersSent = false) {
   return res as typeof res & Response;
 }
 
-const req = {} as Request;
+const REQUEST_CONTEXT = { method: 'POST', path: '/artworks' };
+const req = { ...REQUEST_CONTEXT } as Request;
 
 describe('errorHandler', () => {
   let next: NextFunction & ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     next = vi.fn() as typeof next;
-    vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    vi.clearAllMocks();
   });
 
   it('formats an HttpError with its status, code and message', () => {
@@ -68,7 +71,7 @@ describe('errorHandler', () => {
     expect(res.json).toHaveBeenCalledWith({
       error: { code: 'VALIDATION_ERROR', message: 'Malformed JSON body' },
     });
-    expect(console.error).not.toHaveBeenCalled();
+    expect(logError).not.toHaveBeenCalled();
   });
 
   it('keeps the status of other body-parser client errors', () => {
@@ -85,7 +88,7 @@ describe('errorHandler', () => {
     expect(res.json).toHaveBeenCalledWith({
       error: { code: 'VALIDATION_ERROR', message: 'request entity too large' },
     });
-    expect(console.error).not.toHaveBeenCalled();
+    expect(logError).not.toHaveBeenCalled();
   });
 
   it('treats body-parser server errors as 500', () => {
@@ -99,7 +102,7 @@ describe('errorHandler', () => {
     errorHandler(streamError, req, res, next);
 
     expect(res.status).toHaveBeenCalledWith(500);
-    expect(console.error).toHaveBeenCalledWith(streamError);
+    expect(logError).toHaveBeenCalledWith('Unhandled error', streamError, REQUEST_CONTEXT);
   });
 
   it('maps an undecodable path param to 404 NOT_FOUND', () => {
@@ -112,7 +115,7 @@ describe('errorHandler', () => {
 
     expect(res.status).toHaveBeenCalledWith(404);
     expect(res.json).toHaveBeenCalledWith({ error: { code: 'NOT_FOUND', message: 'Not found' } });
-    expect(console.error).not.toHaveBeenCalled();
+    expect(logError).not.toHaveBeenCalled();
   });
 
   it('treats other URIErrors as 500', () => {
@@ -136,7 +139,7 @@ describe('errorHandler', () => {
     const body = JSON.stringify(res.json.mock.calls[0]?.[0]);
     expect(body).not.toContain('db.internal');
     expect(body).not.toContain('stack');
-    expect(console.error).toHaveBeenCalledWith(err);
+    expect(logError).toHaveBeenCalledWith('Unhandled error', err, REQUEST_CONTEXT);
   });
 
   it('treats non-Error throwables as 500', () => {

@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import type { EntityManager } from 'typeorm';
+import { logError } from '../utils/log-error.js';
 import { AppDataSource } from './data-source.js';
 import { seedAdmin } from './seeds/admin.seed.js';
 import { seedArtworkImages } from './seeds/artwork-images.seed.js';
@@ -35,6 +36,6 @@ try {
   await seed();
   console.info(`Seed complete (${SEED_STEPS.length} steps)`);
 } catch (error) {
-  console.error('Seed failed:', error);
+  logError('Seed failed', error);
   process.exitCode = 1;
 }

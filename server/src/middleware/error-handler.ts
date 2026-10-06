@@ -1,6 +1,7 @@
 import { ERROR_CODES, type ApiErrorBody } from '@art-gallery/shared';
 import type { ErrorRequestHandler } from 'express';
 import { HttpError } from '../utils/http-error.js';
+import { logError } from '../utils/log-error.js';
 
 interface BodyParserClientError {
   type: string;
@@ -36,7 +37,7 @@ function toBody(err: HttpError): ApiErrorBody {
   };
 }
 
-export const errorHandler: ErrorRequestHandler = (err, _req, res, next) => {
+export const errorHandler: ErrorRequestHandler = (err, req, res, next) => {
   // Express's default handler closes the connection if the response already started.
   if (res.headersSent) {
     next(err);
@@ -63,7 +64,7 @@ export const errorHandler: ErrorRequestHandler = (err, _req, res, next) => {
     return;
   }
 
-  console.error(err);
+  logError('Unhandled error', err, { method: req.method, path: req.path });
   res
     .status(500)
     .json(toBody(new HttpError(500, ERROR_CODES.INTERNAL_ERROR, 'Internal server error')));
