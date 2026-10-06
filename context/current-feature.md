@@ -1,4 +1,4 @@
-# Current Feature
+# Current Feature: Setup - Client (Vite, Tailwind v4 & shadcn/ui)
 
 <!-- H1 gets the feature name when active, e.g. "# Current Feature: Add Navbar" -->
 
@@ -6,15 +6,39 @@
 
 <!-- Not Started | In Progress | Complete -->
 
-Not Started
+In Progress
 
 ## Goals
 
 <!-- Bullet points of what success looks like. Filled by `/feature load`. -->
 
+- `client` workspace scaffolded with `npm create vite@latest client -- --template react-ts`, added to the root workspaces and the root `dev` script (client + server together)
+- Vite demo content removed (`App.css`, logos, counter)
+- Dev server on port 5173 with `strictPort: true`
+- Tailwind v4 via `@tailwindcss/vite`; `client/src/index.css` starts with `@import "tailwindcss"`. No `tailwind.config.*` or `postcss.config.*`
+- `@/*` → `src/*` alias in `tsconfig.json`, `tsconfig.app.json` and `vite.config.ts`
+- shadcn/ui initialized (`components.json`, `lib/utils.ts` `cn()`), with `button`, `input`, `label`, `badge`, `skeleton`, `dropdown-menu`, `sonner` added
+- shadcn default colors replaced by the overview's hex tokens (base palette, `--success`, `--footer`, `--footer-foreground`, `--type-*` accents), all exposed via `@theme inline` so `bg-primary`, `bg-footer`, `border-type-painting` work
+- Poppins (`@fontsource/poppins` 400/500/600/700) set as `--font-sans`
+- `lib/format.ts` `formatPrice()` with unit tests (`5500` → `$5,500`, `4500.5` → `$4,500.50`)
+- `client/vitest.config.ts` (Node env, `@` alias), picked up by root `npm test`
+- `client/.env.example` with `VITE_API_URL=http://localhost:8000`
+- Root `eslint.config.js` extended with React Hooks / React Refresh rules for `client/` (scaffold's own ESLint config merged, not kept)
+- Placeholder `App.tsx`: "Explore Our Collection" heading and a primary `Button`
+- `npm run dev`, `npm test`, `npm run typecheck`, `npm run lint` and `npm run build` pass for all workspaces
+
 ## Notes
 
 <!-- Additional context, constraints, or details from the spec. -->
+
+- Verify current Vite / Tailwind v4 / shadcn conventions with Context7 or the official docs before configuring (see `AGENTS.md`)
+- shadcn's Vite guide needs the `@/*` alias in **both** `tsconfig.json` and `tsconfig.app.json`, or `init` can't detect it
+- `shadcn init` writes oklch colors into `index.css`: replace the values with our hex tokens but keep shadcn's variable names so generated components keep working
+- Light theme only: delete the generated `.dark { ... }` block
+- `formatPrice` uses `Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, trailingZeroDisplay: 'stripIfInteger' })`
+- Never hard-code hex values in components; tokens only
+- Verification: Poppins heading + black primary button render; `--primary` resolves to `#111111` in DevTools; a test element with `border-type-painting` shows blue
+- References: https://tailwindcss.com/docs/installation/using-vite · https://ui.shadcn.com/docs/installation/vite · https://ui.shadcn.com/docs/theming · https://fontsource.org/fonts/poppins/install
 
 ## History
 
