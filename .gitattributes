@@ -1,0 +1,2 @@
+# Always check out LF, regardless of core.autocrlf, to match Prettier's endOfLine.
+* text=auto eol=lf
