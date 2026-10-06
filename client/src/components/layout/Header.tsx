@@ -1,5 +1,6 @@
 import { Palette } from 'lucide-react';
 import { Link } from 'react-router';
+import { UserMenu } from './UserMenu';
 
 export function Header() {
   return (
@@ -12,8 +13,7 @@ export function Header() {
           <Palette className="size-6" aria-hidden="true" />
           ArtGalleryManager
         </Link>
-        {/* User menu slot (auth-phase-3) */}
-        <div className="flex items-center gap-3" />
+        <UserMenu />
       </div>
     </header>
   );

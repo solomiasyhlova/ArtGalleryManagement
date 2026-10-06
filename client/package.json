@@ -11,7 +11,9 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@art-gallery/shared": "*",
     "@fontsource/poppins": "^5.3.0",
+    "@hookform/resolvers": "^5.9.1",
     "@tailwindcss/vite": "^4.3.3",
     "@tanstack/react-query": "^5.104.1",
     "class-variance-authority": "^0.7.1",
@@ -20,6 +22,7 @@
     "radix-ui": "^1.7.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
+    "react-hook-form": "^7.89.0",
     "react-router": "^8.4.0",
     "shadcn": "^4.21.3",
     "sonner": "^2.0.8",
