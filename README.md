@@ -7,6 +7,19 @@ by price. Admins can also add, edit and delete artworks.
 Built as the Techstack Trainee Full-Stack JS test task. Both the frontend and the
 backend parts are implemented.
 
+## Live Demo
+
+**https://art-gallery-sttn.onrender.com/**
+
+| Role  | Email                 | Password   |
+| ----- | --------------------- | ---------- |
+| Admin | `admin@gallery.local` | `ADMIN123` |
+
+Log in as the admin to add, edit and delete artworks, or register your own account
+to browse, filter and sort the gallery as a regular user. It runs on Render's free
+plan, so after 15 minutes without traffic the first request can take about a minute
+while the service wakes up.
+
 ## Tech Stack
 
 - **Client:** React + Vite, TypeScript, React Router, TanStack Query, React Hook
@@ -102,7 +115,8 @@ so a change to it needs a new build, not just a restart.
 
 ## API
 
-Base URL: `http://localhost:8000`
+Base URL: `http://localhost:8000` in development, the
+[demo URL](https://art-gallery-sttn.onrender.com) in production.
 
 | Method | Path             | Access |
 | ------ | ---------------- | ------ |

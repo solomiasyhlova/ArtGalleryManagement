@@ -486,4 +486,5 @@ Each step is a feature spec in `context/features/`. Run them in order with
 
 ## Status
 
-Planning. The specification is complete and no code exists yet.
+Finished and deployed. Every roadmap step is implemented, and the app runs on
+Render's free plan at https://art-gallery-sttn.onrender.com/.
